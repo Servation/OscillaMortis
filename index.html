@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="/assets/coin-131982518676438146_512.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OscillaMortis</title>
+    <!-- Premium Google Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=VT323&display=swap" rel="stylesheet">
+  </head>
+  <body>
+    <div id="app">
+      <!-- Game Canvas Container -->
+      <div id="game-container">
+        <canvas id="gameCanvas"></canvas>
+
+        <!-- Interaction Prompt -->
+        <div id="interact-prompt" class="hidden">
+          Press <span class="key-badge">F</span> to Enter Shop
+        </div>
+
+        <!-- Screens Overlay -->
+        <!-- 1. Start Screen -->
+        <div id="start-screen" class="overlay-screen">
+          <div class="glass-panel text-center fade-in">
+            <h1 class="game-title">OSCILLA<span class="accent-text">MORTIS</span></h1>
+            <p class="subtitle">Survive waves of zombies and upgrade your gear in the shop!</p>
+            
+            <div class="controls-guide">
+              <h3>CONTROLS</h3>
+              <div class="grid-controls">
+                <div class="control-row">
+                  <span class="control-key">W</span>
+                  <span class="control-key">A</span>
+                  <span class="control-key">S</span>
+                  <span class="control-key">D</span>
+                  <span class="control-label">Move</span>
+                </div>
+                <div class="control-row">
+                  <span class="control-key long-key">Shift</span>
+                  <span class="control-label">Run (Drains Energy)</span>
+                </div>
+                <div class="control-row">
+                  <span class="control-key long-key">Space</span>
+                  <span class="control-label">Knife Slash</span>
+                </div>
+                <div class="control-row">
+                  <span class="control-key">F</span>
+                  <span class="control-label">Interact / Shop</span>
+                </div>
+              </div>
+            </div>
+
+            <button id="btn-start" class="btn btn-primary btn-glow">START GAME</button>
+          </div>
+        </div>
+
+        <!-- 2. Shop Overlay -->
+        <div id="shop-screen" class="overlay-screen hidden">
+          <div class="glass-panel shop-panel fade-in">
+            <div class="shop-header">
+              <h2>SURVIVOR SHOP</h2>
+              <p>Spend coins to upgrade your combat effectiveness</p>
+            </div>
+            
+            <div class="shop-items-grid" id="shop-items-list">
+              <!-- Rendered Dynamically via TypeScript -->
+            </div>
+
+            <div class="shop-footer">
+              <button id="btn-leave-shop" class="btn btn-secondary">LEAVE SHOP</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. Game Over Screen -->
+        <div id="game-over-screen" class="overlay-screen hidden">
+          <div class="glass-panel game-over-panel text-center">
+            <h1 class="game-title danger-text">YOU DIED</h1>
+            <p class="subtitle">The horde overwhelmed you.</p>
+
+            <div class="stats-display">
+              <p>Coins Collected: <span id="final-coins" class="accent-text">0</span></p>
+              <p>Zombies Spawned: <span id="final-zombies" class="accent-text">0</span></p>
+            </div>
+
+            <button id="btn-restart" class="btn btn-danger btn-glow">PLAY AGAIN</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
