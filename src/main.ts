@@ -3,8 +3,6 @@ import { SoundManager } from "./engine/Sound";
 import { UIManager } from "./components/UI";
 import { Player, type WeaponType, WEAPON_STATS } from "./entities/Player";
 import { Zombie, type ZombieType } from "./entities/Zombie";
-import { Building } from "./entities/Building";
-import type { BuildingTiles } from "./entities/Building";
 import { checkRectCollision, checkCircleSquareCollision } from "./engine/Collision";
 import "./style.css";
 
@@ -18,6 +16,7 @@ import { Shockwave } from "./entities/Shockwave";
 import type { Obstacle, FloorDecal } from "./entities/Obstacle";
 import type { ShopStand, ConsumableItem, WeaponItem } from "./entities/ShopItem";
 import { WEAPON_ITEMS, CONSUMABLE_ITEMS } from "./entities/ShopItem";
+import type { BuildingTiles } from "./entities/Building";
 
 // Setup Canvas and Context
 const canvas = document.getElementById("gameCanvas") as HTMLCanvasElement;
@@ -137,7 +136,8 @@ let floorDecals: FloorDecal[] = [];
 let player: Player;
 let zombies: Zombie[] = [];
 let enemyProjectiles: EnemyProjectile[] = [];
-let shopBuilding: Building;
+const PORTAL_X = 640;
+const PORTAL_Y = 280;
 let resonator: BiomeResonator | null = null;
 let coinDrops: CoinDrop[] = [];
 let obstacles: Obstacle[] = [];
@@ -162,9 +162,9 @@ function generateFloorDecals(): void {
     let rx = Math.random() * MAP_WIDTH;
     let ry = Math.random() * MAP_HEIGHT;
     
-    // Check distance to shop base (avoid drawing decals under shop floor)
-    const dx = rx - (shopBuilding.xBase + 64);
-    const dy = ry - (shopBuilding.yBase + 64);
+    // Check distance to center area (avoid drawing decals under resonator/portal)
+    const dx = rx - 640;
+    const dy = ry - 400;
     const dist = Math.sqrt(dx * dx + dy * dy);
     if (dist < 120) {
       continue;
@@ -389,17 +389,7 @@ function setBiome(biome: BiomeType) {
   currentBiome = biome;
   sound.playAmbience(biome);
 
-  // Relocate shop to random quadrant
-  const quadrants = [
-    { x: 100, y: 100 },
-    { x: 1000, y: 100 },
-    { x: 100, y: 500 },
-    { x: 1000, y: 500 }
-  ];
-  const chosenQuad = quadrants[Math.floor(Math.random() * quadrants.length)];
-  shopBuilding.xBase = chosenQuad.x;
-  shopBuilding.yBase = chosenQuad.y;
-  shopBuilding.updateCachedCanvases(biome);
+
 
   generateBiomeOverlay(biome);
   generateObstacles();
@@ -653,8 +643,7 @@ function initGame() {
 
   resonator = new BiomeResonator();
 
-  // Initialize Building (x: 800, y: 230)
-  shopBuilding = new Building(800, 230, assets.buildingTiles);
+
 
   // Set starting biome (grass)
   generateProceduralBackgrounds();
@@ -1036,29 +1025,56 @@ function updateSpells() {
   }
 }
 
-// Check proximity to enter the main shop doors (outside)
-function checkShopDoorProximity(): boolean {
-  if (shopping) return false;
+// Check proximity to enter the teleport portal (outside)
+function checkPortalProximity(): boolean {
+  if (shopping || wavePhase !== "prep") return false;
 
-  const cx = player.x + 29;
-  const cy = player.y + 59;
-  const doorX = shopBuilding.xBase + 70;
-  const doorY = shopBuilding.yBase + 128;
-  const doorW = 25;
-  const doorH = 10;
+  const cx = player.x + 15; // player center X
+  const cy = player.y + 30; // player center Y
+  const dx = cx - PORTAL_X;
+  const dy = cy - PORTAL_Y;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  return dist <= 35; // 35px radius proximity
+}
 
-  let tempX = cx;
-  let tempY = cy;
+function drawTeleportPortal(ctx: CanvasRenderingContext2D) {
+  if (wavePhase !== "prep" || shopping) return;
 
-  if (cx < doorX) tempX = doorX;
-  else if (cx > doorX + doorW) tempX = doorX + doorW;
+  ctx.save();
+  ctx.translate(PORTAL_X, PORTAL_Y);
 
-  if (cy < doorY) tempY = doorY;
-  else if (cy > doorY + doorH) tempY = doorY + doorH;
+  // 1. Outer spinning ring
+  const rotation = gameCounter * 0.02;
+  ctx.rotate(rotation);
 
-  const disX = cx - tempX;
-  const disY = cy - tempY;
-  return Math.sqrt(disX * disX + disY * disY) <= 14;
+  const grad = ctx.createRadialGradient(0, 0, 5, 0, 0, 30);
+  grad.addColorStop(0, "rgba(59, 130, 246, 0.8)"); // Blue
+  grad.addColorStop(0.5, "rgba(139, 92, 246, 0.4)"); // Purple
+  grad.addColorStop(1, "rgba(139, 92, 246, 0)"); // Transparent
+
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(0, 0, 30, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 2. Swirling portal arcs
+  ctx.strokeStyle = "rgba(147, 197, 253, 0.8)";
+  ctx.lineWidth = 2.5;
+  for (let i = 0; i < 4; i++) {
+    ctx.beginPath();
+    ctx.arc(0, 0, 20 + i * 2, i * Math.PI / 2, i * Math.PI / 2 + Math.PI / 3);
+    ctx.stroke();
+  }
+
+  // 3. Central bright core
+  ctx.fillStyle = "#ffffff";
+  ctx.shadowColor = "#3b82f6";
+  ctx.shadowBlur = 10;
+  ctx.beginPath();
+  ctx.arc(0, 0, 6 + Math.sin(gameCounter * 0.15) * 2, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
 }
 
 // Check proximity to exit door inside shop room
@@ -1243,9 +1259,9 @@ function enterShop() {
 function exitShop() {
   shopping = false;
   keyboard.clear();
-  // Teleport outside in front of shop doors
-  player.x = shopBuilding.xBase + 64;
-  player.y = shopBuilding.yBase + 140;
+  // Teleport outside in front of portal
+  player.x = PORTAL_X - 15;
+  player.y = PORTAL_Y + 50;
 
   // Reset speed/movement states to fix exit-shop speed bug
   player.speedX = 0;
@@ -1460,11 +1476,9 @@ function updatePhysics() {
     
     // Separate axis movement & collision for smooth sliding
     player.updateX();
-    shopBuilding.resolvePlayerCollisionX(player);
     resolveObstaclesCollisionX(player, 14);
 
     player.updateY();
-    shopBuilding.resolvePlayerCollisionY(player);
     resolveObstaclesCollisionY(player, 14);
 
     // Resolve collision with Biome Resonator
@@ -1525,7 +1539,6 @@ function updatePhysics() {
 
       zombie.update();
       if (zombie.zombieType !== "ghost") {
-        shopBuilding.resolveZombieCollision(zombie);
         resolveObstaclesCollisionAll(zombie, 14);
 
         // Resolve collision with Biome Resonator
@@ -1621,19 +1634,14 @@ function updatePhysics() {
       }
     }
 
-    // Proximity to enter shop door
-    const isNearDoor = checkShopDoorProximity();
-    const canEnter = wavePhase === "prep";
+    // Proximity to enter teleport portal
+    const isNearPortal = checkPortalProximity();
 
-    if (isNearDoor) {
-      if (canEnter) {
-        ui.showInteractPrompt(true, "Press [F] to Enter Shop");
-        if (keyboard.isPressed("f")) {
-          sound.play("button");
-          enterShop();
-        }
-      } else {
-        ui.showInteractPrompt(true, "SHOP CLOSED DURING INVASION!");
+    if (isNearPortal) {
+      ui.showInteractPrompt(true, "Press [F] to Enter Teleport");
+      if (keyboard.isPressed("f")) {
+        sound.play("button");
+        enterShop();
       }
     } else {
       ui.showInteractPrompt(false);
@@ -2083,12 +2091,7 @@ function generateObstacles(): void {
         continue;
       }
 
-      // Check collision with the relocated shop building position
-      if (rx >= shopBuilding.xBase - 30 && rx <= shopBuilding.xBase + 158 &&
-          ry >= shopBuilding.yBase - 80 && ry <= shopBuilding.yBase + 158) {
-        attempts++;
-        continue;
-      }
+
 
       let overlapping = false;
       const radius = type === "rock" ? 18 : type === "tombstone" ? 14 : 16;
@@ -2708,8 +2711,8 @@ function drawGame() {
     // Draw floor decals to break up tiling patterns
     drawFloorDecals(ctx);
 
-    // Draw building base (pre-rendered cached canvas)
-    shopBuilding.drawMain(ctx);
+    // Draw teleport portal (preparation phase only)
+    drawTeleportPortal(ctx);
 
     // Draw active shockwaves
     for (const wave of shockwaves) {
@@ -2788,8 +2791,7 @@ function drawGame() {
       bone.draw(ctx, gameCounter);
     }
 
-    // Draw building top section (roof pre-rendered cached canvas)
-    shopBuilding.drawTop(ctx);
+
 
     // Draw Swarm Incursion warning indicators
     if (incursionWarningTimer > 0 && activeIncursionDirection !== null) {
