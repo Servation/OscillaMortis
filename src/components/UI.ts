@@ -40,10 +40,22 @@ export class UIManager {
     }
   }
 
-  public showGameOver(coins: number, totalZombies: number, onRestart: () => void): void {
+  public showGameOver(coins: number, totalZombies: number, onRestart: () => void, resonatorDestroyed: boolean = false): void {
     this.gameOverScreen.classList.remove("hidden");
     this.finalCoins.innerText = coins.toString();
     this.finalZombies.innerText = totalZombies.toString();
+
+    const titleEl = this.gameOverScreen.querySelector<HTMLElement>("h1");
+    const subEl = this.gameOverScreen.querySelector<HTMLElement>(".subtitle");
+    if (titleEl && subEl) {
+      if (resonatorDestroyed) {
+        titleEl.innerText = "DEFENSE FAILED";
+        subEl.innerText = "The Biome Resonator was destroyed!";
+      } else {
+        titleEl.innerText = "YOU DIED";
+        subEl.innerText = "The horde overwhelmed you.";
+      }
+    }
 
     const restartBtn = document.getElementById("btn-restart")!;
     const newRestartBtn = restartBtn.cloneNode(true) as HTMLButtonElement;

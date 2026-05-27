@@ -8,294 +8,32 @@ import type { BuildingTiles } from "./entities/Building";
 import { checkRectCollision, checkCircleSquareCollision } from "./engine/Collision";
 import "./style.css";
 
+// Import extracted entities and interfaces
+import { EnemyProjectile } from "./entities/EnemyProjectile";
+import { BiomeResonator } from "./entities/BiomeResonator";
+import { LootDrop } from "./entities/LootDrop";
+import { CoinDrop } from "./entities/CoinDrop";
+import { SpellProjectile } from "./entities/SpellProjectile";
+import { Shockwave } from "./entities/Shockwave";
+import type { Obstacle, FloorDecal } from "./entities/Obstacle";
+import type { ShopStand, ConsumableItem, WeaponItem } from "./entities/ShopItem";
+import { WEAPON_ITEMS, CONSUMABLE_ITEMS } from "./entities/ShopItem";
+
 // Setup Canvas and Context
 const canvas = document.getElementById("gameCanvas") as HTMLCanvasElement;
 const ctx = canvas.getContext("2d")!;
 
 // Canvas coordinate dimensions
-const MAP_WIDTH = 1280;
-const MAP_HEIGHT = 800;
+export const MAP_WIDTH = 1280;
+export const MAP_HEIGHT = 800;
 canvas.width = MAP_WIDTH;
 canvas.height = MAP_HEIGHT;
 
 // Core Engines & State
 const keyboard = new Keyboard();
-const sound = new SoundManager();
+export const sound = new SoundManager();
 const ui = new UIManager();
 
-// Spell Projectiles and Shockwaves are defined below
-
-// Enemy Projectile Class (Bone)
-class EnemyProjectile {
-  public x: number;
-  public y: number;
-  public speedX: number;
-  public speedY: number;
-  public active: boolean = true;
-  public damage: number;
-  public readonly radius: number = 6;
-
-  constructor(x: number, y: number, targetX: number, targetY: number, damage: number) {
-    this.x = x;
-    this.y = y;
-    this.damage = damage;
-
-    const angle = Math.atan2(targetY - y, targetX - x);
-    const speed = 4.5;
-    this.speedX = Math.cos(angle) * speed;
-    this.speedY = Math.sin(angle) * speed;
-  }
-
-  public update(): void {
-    this.x += this.speedX;
-    this.y += this.speedY;
-
-    // Deactivate if out of map bounds
-    if (this.x < 0 || this.x > MAP_WIDTH || this.y < 0 || this.y > MAP_HEIGHT) {
-      this.active = false;
-    }
-  }
-
-  public draw(ctx: CanvasRenderingContext2D, gameCounter: number): void {
-    ctx.save();
-    ctx.translate(this.x, this.y);
-    ctx.rotate(gameCounter * 0.1);
-    
-    ctx.fillStyle = "#e2e8f0"; // bone white
-    ctx.strokeStyle = "#cbd5e1";
-    ctx.lineWidth = 1.5;
-
-    // Bone shape: central line with 4 circles at the ends
-    ctx.fillRect(-8, -2, 16, 4);
-    ctx.beginPath();
-    ctx.arc(-8, -3, 3, 0, Math.PI * 2);
-    ctx.arc(-8, 3, 3, 0, Math.PI * 2);
-    ctx.arc(8, -3, 3, 0, Math.PI * 2);
-    ctx.arc(8, 3, 3, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.restore();
-  }
-}
-
-// Spell Classes & State Arrays
-// Loot Drop Class (Spell Books, Health/Energy Potions)
-class LootDrop {
-  public x: number;
-  public y: number;
-  public speedX: number;
-  public speedY: number;
-  public active: boolean = true;
-  public type: "aoe" | "fire" | "poison" | "frost" | "health" | "energy";
-  public friction: number = 0.95;
-  public life: number = 600;
-  public sparkleTimer: number = 0;
-
-  constructor(x: number, y: number, type: "aoe" | "fire" | "poison" | "frost" | "health" | "energy") {
-    this.x = x;
-    this.y = y;
-    this.type = type;
-    const angle = Math.random() * Math.PI * 2;
-    const force = 1.5 + Math.random() * 3.0;
-    this.speedX = Math.cos(angle) * force;
-    this.speedY = Math.sin(angle) * force;
-    this.sparkleTimer = Math.floor(Math.random() * 30);
-  }
-
-  public update(player: Player) {
-    this.speedX *= this.friction;
-    this.speedY *= this.friction;
-    this.x += this.speedX;
-    this.y += this.speedY;
-
-    if (this.x < 10) { this.x = 10; this.speedX *= -0.5; }
-    if (this.x > MAP_WIDTH - 10) { this.x = MAP_WIDTH - 10; this.speedX *= -0.5; }
-    if (this.y < 10) { this.y = 10; this.speedY *= -0.5; }
-    if (this.y > MAP_HEIGHT - 10) { this.y = MAP_HEIGHT - 10; this.speedY *= -0.5; }
-
-    const px = player.x + 30;
-    const py = player.y + 32;
-    const dx = px - this.x;
-    const dy = py - this.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-
-    if (dist < 80) {
-      const magSpeed = 5.0;
-      this.speedX += (dx / dist) * 0.8;
-      this.speedY += (dy / dist) * 0.8;
-      const currentSpeed = Math.sqrt(this.speedX * this.speedX + this.speedY * this.speedY);
-      if (currentSpeed > magSpeed) {
-        this.speedX = (this.speedX / currentSpeed) * magSpeed;
-        this.speedY = (this.speedY / currentSpeed) * magSpeed;
-      }
-    }
-
-    if (dist < 20) {
-      if (this.type === "health") {
-        player.Health = Math.min(100, player.Health + 25);
-        sound.play("coin_pickup", 0.6);
-      } else if (this.type === "energy") {
-        player.Energy = Math.min(100, player.Energy + 40);
-        sound.play("coin_pickup", 0.6);
-      } else {
-        player.tomes[this.type]++;
-        sound.play("coin_pickup", 0.5);
-      }
-      this.active = false;
-    }
-
-    this.life--;
-    if (this.life <= 0) {
-      this.active = false;
-    }
-  }
-
-  public draw(ctx: CanvasRenderingContext2D) {
-    ctx.save();
-    if (this.life < 120) {
-      ctx.globalAlpha = this.life / 120;
-    }
-
-    ctx.fillStyle = "rgba(0, 0, 0, 0.25)";
-    ctx.beginPath();
-    ctx.ellipse(this.x, this.y + 6, 8, 4, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    const bob = Math.sin(gameCounter * 0.1 + this.sparkleTimer) * 2;
-
-    ctx.save();
-    ctx.translate(this.x, this.y + bob);
-
-    const key = this.type === "health" ? "health_1" :
-                this.type === "energy" ? "energy" :
-                this.type === "fire" ? "spelltome_fire" :
-                this.type === "poison" ? "spelltome_poison" :
-                this.type === "frost" ? "spelltome_frost" : "spelltome_aoe";
-    const img = itemImages.get(key);
-
-    if (img) {
-      ctx.shadowColor = this.type === "health" ? "#ef4444" :
-                        this.type === "energy" ? "#eab308" :
-                        this.type === "fire" ? "#f97316" :
-                        this.type === "poison" ? "#22c55e" :
-                        this.type === "frost" ? "#3b82f6" : "#fbbf24";
-      ctx.shadowBlur = 8;
-      ctx.drawImage(img, -12, -12, 24, 24);
-    } else if (this.type === "health") {
-      ctx.shadowColor = "#ef4444";
-      ctx.shadowBlur = 8;
-      ctx.fillStyle = "#ef4444";
-      ctx.beginPath();
-      ctx.arc(0, 2, 6, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(-2, -5, 4, 4);
-      ctx.fillStyle = "#854d0e";
-      ctx.fillRect(-3, -7, 6, 2);
-    } else if (this.type === "energy") {
-      ctx.shadowColor = "#eab308";
-      ctx.shadowBlur = 8;
-      ctx.fillStyle = "#eab308";
-      ctx.beginPath();
-      ctx.arc(0, 2, 6, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(-2, -5, 4, 4);
-      ctx.fillStyle = "#854d0e";
-      ctx.fillRect(-3, -7, 6, 2);
-    } else {
-      ctx.shadowColor = this.type === "fire" ? "#f97316" :
-                        this.type === "poison" ? "#22c55e" :
-                        this.type === "frost" ? "#3b82f6" : "#fbbf24";
-      ctx.shadowBlur = 8;
-
-      ctx.fillStyle = this.type === "fire" ? "#ef4444" :
-                      this.type === "poison" ? "#10b981" :
-                      this.type === "frost" ? "#2563eb" : "#d97706";
-      ctx.fillRect(-6, -8, 12, 16);
-      
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(-4, -6, 8, 2);
-      ctx.fillRect(-4, -2, 8, 2);
-    }
-
-    ctx.restore();
-    ctx.restore();
-  }
-}
-
-class SpellProjectile {
-  public x: number;
-  public y: number;
-  public speedX: number;
-  public speedY: number;
-  public active: boolean = true;
-  public type: "fire" | "poison" | "frost";
-  public radius: number = 8;
-
-  constructor(x: number, y: number, angle: number, type: "fire" | "poison" | "frost") {
-    this.x = x;
-    this.y = y;
-    this.type = type;
-    const speed = 7.0;
-    this.speedX = Math.cos(angle) * speed;
-    this.speedY = Math.sin(angle) * speed;
-  }
-
-  public update() {
-    this.x += this.speedX;
-    this.y += this.speedY;
-    if (this.x < 0 || this.x > MAP_WIDTH || this.y < 0 || this.y > MAP_HEIGHT) {
-      this.active = false;
-    }
-  }
-
-  public draw(ctx: CanvasRenderingContext2D) {
-    ctx.save();
-    const color = this.type === "fire" ? "#f97316" :
-                  this.type === "poison" ? "#22c55e" : "#3b82f6";
-    ctx.fillStyle = color;
-    ctx.shadowColor = color;
-    ctx.shadowBlur = 10;
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  }
-}
-
-class Shockwave {
-  public x: number;
-  public y: number;
-  public radius: number = 10;
-  public maxRadius: number = 150;
-  public speed: number = 8;
-  public active: boolean = true;
-  public hitZombies: Set<Zombie> = new Set();
-
-  constructor(x: number, y: number) {
-    this.x = x;
-    this.y = y;
-  }
-
-  public update() {
-    this.radius += this.speed;
-    if (this.radius >= this.maxRadius) {
-      this.active = false;
-    }
-  }
-
-  public draw(ctx: CanvasRenderingContext2D) {
-    ctx.save();
-    ctx.strokeStyle = "rgba(251, 191, 36, 0.7)";
-    ctx.lineWidth = 4 * (1 - this.radius / this.maxRadius) + 1;
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.restore();
-  }
-}
 
 let lootDrops: LootDrop[] = [];
 let spellProjectiles: SpellProjectile[] = [];
@@ -393,286 +131,6 @@ function filterImageTransparency(img: HTMLImageElement): Promise<HTMLImageElemen
   });
 }
 
-// Coin Drop Entity Class
-class CoinDrop {
-  public x: number;
-  public y: number;
-  public speedX: number;
-  public speedY: number;
-  public active: boolean = true;
-  public value: number;
-  public friction: number = 0.95;
-  public life: number = 600; // 10 seconds at 60fps
-  public sparkleTimer: number = 0;
-
-  constructor(x: number, y: number, value: number) {
-    this.x = x;
-    this.y = y;
-    this.value = value;
-    const angle = Math.random() * Math.PI * 2;
-    const force = 2.0 + Math.random() * 4.0;
-    this.speedX = Math.cos(angle) * force;
-    this.speedY = Math.sin(angle) * force;
-    this.sparkleTimer = Math.floor(Math.random() * 30);
-  }
-
-  public update(player: Player) {
-    this.speedX *= this.friction;
-    this.speedY *= this.friction;
-    this.x += this.speedX;
-    this.y += this.speedY;
-
-    if (this.x < 10) { this.x = 10; this.speedX *= -0.5; }
-    if (this.x > MAP_WIDTH - 10) { this.x = MAP_WIDTH - 10; this.speedX *= -0.5; }
-    if (this.y < 10) { this.y = 10; this.speedY *= -0.5; }
-    if (this.y > MAP_HEIGHT - 10) { this.y = MAP_HEIGHT - 10; this.speedY *= -0.5; }
-
-    const px = player.x + 30;
-    const py = player.y + 32;
-    const dx = px - this.x;
-    const dy = py - this.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-
-    if (dist < 80) {
-      const magSpeed = 5.0;
-      this.speedX += (dx / dist) * 0.8;
-      this.speedY += (dy / dist) * 0.8;
-      const currentSpeed = Math.sqrt(this.speedX * this.speedX + this.speedY * this.speedY);
-      if (currentSpeed > magSpeed) {
-        this.speedX = (this.speedX / currentSpeed) * magSpeed;
-        this.speedY = (this.speedY / currentSpeed) * magSpeed;
-      }
-    }
-
-    if (dist < 20) {
-      player.Coin += this.value;
-      this.active = false;
-      sound.play("coin_pickup", 0.3);
-    }
-
-    this.life--;
-    if (this.life <= 0) {
-      this.active = false;
-    }
-  }
-
-  public draw(ctx: CanvasRenderingContext2D) {
-    ctx.save();
-    if (this.life < 120) {
-      ctx.globalAlpha = this.life / 120;
-    }
-
-    ctx.fillStyle = "rgba(0, 0, 0, 0.25)";
-    ctx.beginPath();
-    ctx.ellipse(this.x, this.y + 6, 6, 3, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    const bob = Math.sin(gameCounter * 0.1 + this.sparkleTimer) * 2;
-
-    ctx.fillStyle = "#fbbf24";
-    ctx.strokeStyle = "#d97706";
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.arc(this.x, this.y + bob, 5, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-
-    if ((gameCounter + this.sparkleTimer) % 60 < 10) {
-      ctx.fillStyle = "#ffffff";
-      ctx.beginPath();
-      ctx.arc(this.x + 2, this.y - 2 + bob, 1.5, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.restore();
-  }
-}
-
-// Shop items & structures
-interface ShopItem {
-  type: "weapon" | "consumable";
-  name: string;
-  cost: number;
-  tier: 1 | 2 | 3;
-  purchased: boolean;
-  weaponType?: WeaponType;
-  consumableType?: string;
-  description?: string;
-  onBuy?: (player: Player) => string;
-}
-
-interface ShopStand {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  item: ShopItem | null;
-}
-
-interface ConsumableItem {
-  name: string;
-  consumableType: string;
-  tier: 1 | 2 | 3;
-  cost: number;
-  weight: number;
-  description: string;
-  onBuy: (player: Player) => string;
-}
-
-interface WeaponItem {
-  weaponType: WeaponType;
-  cost: number;
-  tier: 1 | 2 | 3;
-  weight: number;
-}
-
-const WEAPON_ITEMS: WeaponItem[] = [
-  { weaponType: "Short Sword", cost: 15, tier: 1, weight: 35 },
-  { weaponType: "Wooden Club", cost: 20, tier: 1, weight: 25 },
-  { weaponType: "Iron Sword", cost: 40, tier: 2, weight: 20 },
-  { weaponType: "Baseball Bat", cost: 50, tier: 2, weight: 10 },
-  { weaponType: "Machete", cost: 75, tier: 3, weight: 7 },
-  { weaponType: "Fire Axe", cost: 110, tier: 3, weight: 3 }
-];
-
-const CONSUMABLE_ITEMS: ConsumableItem[] = [
-  {
-    name: "Health Elixir",
-    consumableType: "health_1",
-    tier: 1,
-    cost: 10,
-    weight: 45,
-    description: "Heals +35 HP",
-    onBuy: (player) => {
-      player.Health = Math.min(100, player.Health + 35);
-      return "HEALED +35 HP!";
-    }
-  },
-  {
-    name: "Greater Health Elixir",
-    consumableType: "health_2",
-    tier: 2,
-    cost: 22,
-    weight: 20,
-    description: "Heals +75 HP",
-    onBuy: (player) => {
-      player.Health = Math.min(100, player.Health + 75);
-      return "HEALED +75 HP!";
-    }
-  },
-  {
-    name: "Tome of Wrath",
-    consumableType: "spelltome_aoe",
-    tier: 1,
-    cost: 10,
-    weight: 25,
-    description: "AOE Blast tome",
-    onBuy: (player) => {
-      player.tomes.aoe++;
-      return "PURCHASED WRATH TOME (+1)!";
-    }
-  },
-  {
-    name: "Tome of Fire",
-    consumableType: "spelltome_fire",
-    tier: 2,
-    cost: 14,
-    weight: 20,
-    description: "Fire DOT tome",
-    onBuy: (player) => {
-      player.tomes.fire++;
-      return "PURCHASED FIRE TOME (+1)!";
-    }
-  },
-  {
-    name: "Tome of Poison",
-    consumableType: "spelltome_poison",
-    tier: 2,
-    cost: 12,
-    weight: 20,
-    description: "Poison DOT tome",
-    onBuy: (player) => {
-      player.tomes.poison++;
-      return "PURCHASED POISON TOME (+1)!";
-    }
-  },
-  {
-    name: "Tome of Frost",
-    consumableType: "spelltome_frost",
-    tier: 2,
-    cost: 15,
-    weight: 18,
-    description: "Freeze slow/block tome",
-    onBuy: (player) => {
-      player.tomes.frost++;
-      return "PURCHASED FROST TOME (+1)!";
-    }
-  },
-  {
-    name: "Iron Skin Brew",
-    consumableType: "ironskin",
-    tier: 2,
-    cost: 18,
-    weight: 15,
-    description: "+25% Def for Next Wave",
-    onBuy: (player) => {
-      player.damageReduction = 0.25;
-      return "IRONSKIN ACTIVE (25% DEF)!";
-    }
-  },
-  {
-    name: "Swiftness Draught",
-    consumableType: "swiftness",
-    tier: 2,
-    cost: 18,
-    weight: 15,
-    description: "+30% Speed for Next Wave",
-    onBuy: (player) => {
-      player.speedBoost = 0.30;
-      return "SWIFTNESS ACTIVE (30% SPEED)!";
-    }
-  },
-  {
-    name: "Spell Book of Power",
-    consumableType: "spellbook",
-    tier: 3,
-    cost: 45,
-    weight: 8,
-    description: "Permanent +25% Magic DMG",
-    onBuy: (player) => {
-      player.magicDamageMultiplier += 0.25;
-      return "PERMANENT MAGIC DAMAGE +25%!";
-    }
-  },
-  {
-    name: "Energy Tonic",
-    consumableType: "energy",
-    tier: 2,
-    cost: 18,
-    weight: 15,
-    description: "+300% Energy Regen",
-    onBuy: (player) => {
-      player.energyRegenRate = 0.45; // 0.45 per tick
-      return "ENERGY TONIC ACTIVE (+300% REGEN)!";
-    }
-  }
-];
-
-interface Obstacle {
-  x: number;
-  y: number;
-  radius: number;
-  type: "rock" | "tombstone" | "shrub";
-  color: string;
-  outlineColor: string;
-  size: number;
-}
-
-interface FloorDecal {
-  x: number;
-  y: number;
-  size: number;
-  type: number;
-}
 let floorDecals: FloorDecal[] = [];
 
 // Game State Variables
@@ -680,6 +138,7 @@ let player: Player;
 let zombies: Zombie[] = [];
 let enemyProjectiles: EnemyProjectile[] = [];
 let shopBuilding: Building;
+let resonator: BiomeResonator | null = null;
 let coinDrops: CoinDrop[] = [];
 let obstacles: Obstacle[] = [];
 type BiomeType = "grass" | "desert" | "tundra" | "lava";
@@ -966,6 +425,13 @@ let waveKilledZombies = 0;
 let wavePrepTimer = 0; // Ticks countdown (45 seconds = 2700 ticks)
 let prepTimerStarted = false;
 
+// Swarm Incursion State
+let activeIncursionDirection: "top" | "bottom" | "left" | "right" | null = null;
+let incursionWarningTimer = 0;
+let incursionSpawnsRemaining = 0;
+let currentIncursionIndex = 0;
+let incursionIntervalTimer = 0;
+
 // Shop Interior Variables
 let shopping = false;
 let shopAnnounceMessage = "";
@@ -1165,11 +631,17 @@ function initGame() {
   // Wave initialization
   waveNumber = 1;
   wavePhase = "horde";
-  waveTotalZombies = 5;
+  waveTotalZombies = 0; // Will be set dynamically by incursions
   waveSpawnsTriggered = 0;
   waveKilledZombies = 0;
   wavePrepTimer = 0;
   prepTimerStarted = false;
+
+  activeIncursionDirection = null;
+  incursionWarningTimer = 0;
+  incursionSpawnsRemaining = 0;
+  currentIncursionIndex = 0;
+  incursionIntervalTimer = 0;
 
   // Initialize Player
   player = new Player(
@@ -1178,6 +650,8 @@ function initGame() {
     MAP_WIDTH,
     MAP_HEIGHT
   );
+
+  resonator = new BiomeResonator();
 
   // Initialize Building (x: 800, y: 230)
   shopBuilding = new Building(800, 230, assets.buildingTiles);
@@ -1196,24 +670,24 @@ function initGame() {
   zombies = [];
 }
 
-// Spawns a single zombie of appropriate type for the active wave
-function spawnZombieForWave() {
-  const loc = Math.floor(Math.random() * 4);
+// Spawns a single zombie of appropriate type for the active wave from a specific direction
+function spawnZombieFromDirection(dir: "top" | "bottom" | "left" | "right") {
   let spawnX = 0;
   let spawnY = 0;
+  const offset = (Math.random() - 0.5) * 160;
 
-  if (loc === 0) {
-    spawnX = MAP_WIDTH / 2;
+  if (dir === "top") {
+    spawnX = MAP_WIDTH / 2 + offset;
     spawnY = -60;
-  } else if (loc === 1) {
-    spawnX = MAP_WIDTH / 2;
+  } else if (dir === "bottom") {
+    spawnX = MAP_WIDTH / 2 + offset;
     spawnY = MAP_HEIGHT + 30;
-  } else if (loc === 2) {
+  } else if (dir === "right") {
     spawnX = MAP_WIDTH + 20;
-    spawnY = MAP_HEIGHT / 2;
-  } else {
+    spawnY = MAP_HEIGHT / 2 + offset;
+  } else { // left
     spawnX = -20;
-    spawnY = MAP_HEIGHT / 2;
+    spawnY = MAP_HEIGHT / 2 + offset;
   }
 
   // Difficulty Type Distribution based on wave progress
@@ -1253,7 +727,11 @@ function spawnZombieForWave() {
   else if (type === "skeleton") zSheet = skeletonSheet;
   else if (type === "brute") zSheet = bruteSheet;
 
-  zombies.push(new Zombie(zSheet, MAP_WIDTH, MAP_HEIGHT, spawnX, spawnY, type));
+  const z = new Zombie(zSheet, MAP_WIDTH, MAP_HEIGHT, spawnX, spawnY, type);
+  // Default target: 70% resonator, 30% player
+  z.aggroTarget = Math.random() < 0.70 ? "resonator" : "player";
+
+  zombies.push(z);
   waveSpawnsTriggered += 1;
 }
 
@@ -1440,6 +918,7 @@ function processKnifing() {
           // Swing Damage from weapon stats
           const baseDmg = stats.baseDmg;
           zombie.Health -= baseDmg * player.sMultiplier;
+          zombie.aggroTarget = "player"; // Pull aggro!
 
           // Swing Knockback based on weapon range / stats
           const knockForce = stats.range === "large" ? 18 :
@@ -1491,6 +970,7 @@ function updateSpells() {
         );
 
         if (hit) {
+          zombie.aggroTarget = "player"; // Pull aggro!
           const dmgMultiplier = player.magicDamageMultiplier;
           if (proj.type === "fire") {
             zombie.Health -= 20 * dmgMultiplier;
@@ -1538,6 +1018,7 @@ function updateSpells() {
 
         if (dist <= wave.radius) {
           wave.hitZombies.add(zombie);
+          zombie.aggroTarget = "player"; // Pull aggro!
           zombie.Health -= 50 * player.magicDamageMultiplier;
 
           // Apply knockback
@@ -1780,21 +1261,64 @@ function exitShop() {
 // Wave Progression & State Manager
 function updateWaveSystem() {
   if (wavePhase === "horde") {
-    // Spawn zombies incrementally
-    if (waveSpawnsTriggered < waveTotalZombies) {
-      // Spawn one zombie every 90 ticks
-      if (gameCounter % 90 === 0) {
-        spawnZombieForWave();
+    // Incursion Progression
+    const incursionsTotal = 2 + Math.floor(waveNumber / 2);
+    incursionIntervalTimer++;
+
+    // Check if we need to start/queue a new incursion
+    if (activeIncursionDirection === null && incursionSpawnsRemaining === 0 && currentIncursionIndex < incursionsTotal) {
+      let shouldQueue = false;
+      if (currentIncursionIndex === 0) {
+        shouldQueue = true; // Start first incursion immediately
+      } else if (zombies.length === 0) {
+        shouldQueue = true; // Queue if all previous zombies are dead
+      } else if (incursionIntervalTimer >= 900) { // 15 seconds
+        shouldQueue = true; // Queue after 15 seconds interval
+      }
+      
+      if (shouldQueue) {
+        const dirs: ("top" | "bottom" | "left" | "right")[] = ["top", "bottom", "left", "right"];
+        activeIncursionDirection = dirs[Math.floor(Math.random() * dirs.length)];
+        incursionWarningTimer = 120; // 2 seconds warning
+        const groupSize = Math.min(10, 3 + waveNumber);
+        incursionSpawnsRemaining = groupSize;
+        waveTotalZombies += groupSize;
+        currentIncursionIndex++;
+        incursionIntervalTimer = 0;
+      }
+    }
+
+    if (activeIncursionDirection !== null) {
+      if (incursionWarningTimer > 0) {
+        incursionWarningTimer--;
+      } else if (incursionSpawnsRemaining > 0) {
+        if (gameCounter % 15 === 0) {
+          spawnZombieFromDirection(activeIncursionDirection);
+          incursionSpawnsRemaining--;
+          if (incursionSpawnsRemaining === 0) {
+            activeIncursionDirection = null;
+          }
+        }
       }
     }
 
     // Check if wave is fully cleared
-    if (waveKilledZombies >= waveTotalZombies) {
+    if (currentIncursionIndex === incursionsTotal && incursionSpawnsRemaining === 0 && waveKilledZombies >= waveTotalZombies) {
       wavePhase = "prep";
       wavePrepTimer = 2700; // 45 seconds countdown
       prepTimerStarted = false; // Pause timer until they exit the shop
       sound.play("button");
-      shopAnnounceMessage = "WAVE CLEARED! SHOP OPENED!";
+
+      // Calculate gold bonus based on remaining Resonator health
+      let bonusText = "";
+      if (resonator) {
+        const coinBonus = Math.floor(50 * (resonator.health / resonator.maxHealth));
+        player.Coin += coinBonus;
+        bonusText = ` RESONATOR BONUS: +${coinBonus} COINS!`;
+        resonator.health = resonator.maxHealth; // Restore resonator health
+      }
+
+      shopAnnounceMessage = `WAVE CLEARED! SHOP OPENED!${bonusText}`;
       shopAnnounceTimer = 180;
       // Clear remaining active zombies array safely
       zombies = [];
@@ -1818,12 +1342,23 @@ function startNextWave() {
   }
   wavePhase = "horde";
   waveNumber += 1;
-  // Scale total wave size (Wave 1: 5, Wave 2: 9, Wave 3: 13, etc.)
-  waveTotalZombies = 5 + (waveNumber - 1) * 4;
+  
+  waveTotalZombies = 0; // Will be set dynamically by incursions
   waveSpawnsTriggered = 0;
   waveKilledZombies = 0;
   wavePrepTimer = 0;
   prepTimerStarted = false;
+
+  activeIncursionDirection = null;
+  incursionWarningTimer = 0;
+  incursionSpawnsRemaining = 0;
+  currentIncursionIndex = 0;
+  incursionIntervalTimer = 0;
+
+  if (resonator) {
+    resonator.health = resonator.maxHealth;
+  }
+
   zombies = [];
   spellProjectiles = [];
   lootDrops = [];
@@ -1932,6 +1467,25 @@ function updatePhysics() {
     shopBuilding.resolvePlayerCollisionY(player);
     resolveObstaclesCollisionY(player, 14);
 
+    // Resolve collision with Biome Resonator
+    if (resonator && resonator.health > 0) {
+      const pCx = player.x + 29;
+      const pCy = player.y + 59;
+      const dx = pCx - resonator.x;
+      const dy = pCy - resonator.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const minDist = resonator.radius + 14;
+      if (dist < minDist) {
+        const push = minDist - dist;
+        if (dist > 0) {
+          player.x += (dx / dist) * push;
+          player.y += (dy / dist) * push;
+        } else {
+          player.y += push;
+        }
+      }
+    }
+
     player.postUpdate(hasInput);
 
     // Update Coin Drops
@@ -1957,6 +1511,7 @@ function updatePhysics() {
       const zombie = zombies[i];
       zombie.runAI(
         player,
+        resonator,
         gameCounter,
         (sfx) => sound.play(sfx),
         (sx, sy, tx, ty) => {
@@ -1972,6 +1527,25 @@ function updatePhysics() {
       if (zombie.zombieType !== "ghost") {
         shopBuilding.resolveZombieCollision(zombie);
         resolveObstaclesCollisionAll(zombie, 14);
+
+        // Resolve collision with Biome Resonator
+        if (resonator && resonator.health > 0) {
+          const zCx = zombie.x + 29;
+          const zCy = zombie.y + 59;
+          const dx = zCx - resonator.x;
+          const dy = zCy - resonator.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          const minDist = resonator.radius + 14;
+          if (dist < minDist) {
+            const push = minDist - dist;
+            if (dist > 0) {
+              zombie.x += (dx / dist) * push;
+              zombie.y += (dy / dist) * push;
+            } else {
+              zombie.y += push;
+            }
+          }
+        }
 
         // Resolve collision with player feet circle to prevent overlapping
         const pCx = player.x + 29;
@@ -3144,12 +2718,12 @@ function drawGame() {
 
     // Draw loot drops
     for (const drop of lootDrops) {
-      drop.draw(ctx);
+      drop.draw(ctx, itemImages, gameCounter);
     }
 
     // Draw coin drops
     for (const coin of coinDrops) {
-      coin.draw(ctx);
+      coin.draw(ctx, gameCounter);
     }
 
     // Collect all Y-sortable entities (Player, Zombies, Obstacles)
@@ -3158,6 +2732,14 @@ function drawGame() {
       draw: () => void;
     }
     const renderList: YSortable[] = [];
+
+    // Add Biome Resonator
+    if (resonator && resonator.health > 0) {
+      renderList.push({
+        ySort: resonator.y + 14,
+        draw: () => resonator!.draw(ctx, gameCounter, currentBiome)
+      });
+    }
 
     // Add Player
     if (player.visible) {
@@ -3208,6 +2790,76 @@ function drawGame() {
 
     // Draw building top section (roof pre-rendered cached canvas)
     shopBuilding.drawTop(ctx);
+
+    // Draw Swarm Incursion warning indicators
+    if (incursionWarningTimer > 0 && activeIncursionDirection !== null) {
+      if (gameCounter % 20 < 10) { // Flashing frequency
+        ctx.save();
+        
+        // Determine arrow center position based on direction
+        let ax = 0;
+        let ay = 0;
+        let angle = 0;
+        
+        if (activeIncursionDirection === "top") {
+          ax = MAP_WIDTH / 2;
+          ay = 50;
+          angle = -Math.PI / 2;
+        } else if (activeIncursionDirection === "bottom") {
+          ax = MAP_WIDTH / 2;
+          ay = MAP_HEIGHT - 50;
+          angle = Math.PI / 2;
+        } else if (activeIncursionDirection === "left") {
+          ax = 50;
+          ay = MAP_HEIGHT / 2;
+          angle = Math.PI;
+        } else if (activeIncursionDirection === "right") {
+          ax = MAP_WIDTH - 50;
+          ay = MAP_HEIGHT / 2;
+          angle = 0;
+        }
+        
+        // Draw a glowing red warning arrow
+        ctx.translate(ax, ay);
+        ctx.rotate(angle);
+        
+        ctx.fillStyle = "rgba(220, 38, 38, 0.85)";
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(30, 0);
+        ctx.lineTo(0, -25);
+        ctx.lineTo(0, -10);
+        ctx.lineTo(-40, -10);
+        ctx.lineTo(-40, 10);
+        ctx.lineTo(0, 10);
+        ctx.lineTo(0, 25);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // Warning sign label
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 20px monospace";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("!", -15, 0);
+        
+        ctx.restore();
+        
+        // Center text alert
+        ctx.save();
+        ctx.fillStyle = "#ef4444";
+        ctx.font = "bold 56px 'VT323', monospace";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.strokeStyle = "#000000";
+        ctx.lineWidth = 6;
+        ctx.strokeText("WARNING: SWARM INCOMING!", MAP_WIDTH / 2, MAP_HEIGHT / 2 - 150);
+        ctx.fillText("WARNING: SWARM INCOMING!", MAP_WIDTH / 2, MAP_HEIGHT / 2 - 150);
+        ctx.restore();
+      }
+    }
   }
 
   // --- DRAW CANVAS HUD OVERLAYS ---
@@ -3241,11 +2893,11 @@ function drawGame() {
   }
 
   // Draw Game Over overlay
-  if (player.Health <= 0) {
+  if (player.Health <= 0 || (resonator && resonator.health <= 0)) {
     ui.showGameOver(player.Coin, waveSpawnsTriggered, () => {
       sound.play("button");
       initGame();
-    });
+    }, resonator ? resonator.health <= 0 : false);
   }
 }
 

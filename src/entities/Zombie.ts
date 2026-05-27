@@ -44,6 +44,7 @@ export class Zombie {
   public isFrozenBlock: boolean = false;
   public frozenBlockTicks: number = 0;
   public hasEnteredPlayableArea: boolean = false;
+  public aggroTarget: "player" | "resonator" = "resonator";
 
   public get maxSpeedVal(): number {
     let speed = this.maxSpeed;
@@ -309,6 +310,7 @@ export class Zombie {
   // Zombie AI logic
   public runAI(
     player: Player,
+    resonator: { x: number; y: number; health: number; takeDamage: (amount: number) => void } | null,
     counter: number,
     playSoundCallback: (sound: string) => void,
     spawnProjectileCallback?: (sx: number, sy: number, tx: number, ty: number) => void
@@ -322,12 +324,21 @@ export class Zombie {
       return;
     }
 
-    // Check if player is detected (Runner aggro range is 1.25x bigger, Brute is 0.9x, slime is 0.8x)
+    let target = { x: player.x, y: player.y, width: 61, height: 64 };
+    let actualTargetType: "player" | "resonator" = "player";
+
+    if (this.aggroTarget === "resonator" && resonator && resonator.health > 0) {
+      target = { x: resonator.x - 28, y: resonator.y - 28, width: 56, height: 56 };
+      actualTargetType = "resonator";
+    }
+
+    // Check if target is detected (Runner aggro range is 1.25x bigger, Brute is 0.9x, slime is 0.8x)
     const activeRadius = this.zombieType === "runner" ? this.cRadius * 1.25 : 
                          this.zombieType === "brute" ? this.cRadius * 0.9 : 
                          (this.zombieType === "slime" || this.zombieType === "minislime") ? this.cRadius * 0.8 : this.cRadius;
 
-    const isPlayerDetected = checkCircleSquareCollision(
+    // Resonator is constantly detected; player requires proximity
+    const isTargetDetected = actualTargetType === "resonator" || checkCircleSquareCollision(
       this.cx,
       this.cy,
       activeRadius,
@@ -337,11 +348,14 @@ export class Zombie {
       64
     );
 
-    if (isPlayerDetected) {
+    if (isTargetDetected) {
       if (this.playZomSound) {
         playSoundCallback(MOB_SOUND_MAP[this.zombieType] || "zombie");
         this.playZomSound = false;
       }
+
+      const tx = actualTargetType === "resonator" ? target.x + target.width / 2 : player.x + 15;
+      const ty = actualTargetType === "resonator" ? target.y + target.height / 2 : player.y + 30;
 
       // Handle custom AIs
       if (this.zombieType === "slime" || this.zombieType === "minislime") {
@@ -353,8 +367,8 @@ export class Zombie {
           this.moving = false;
           if (this.slimeRestTicks === 0) {
             this.slimeJumpTicks = 35;
-            const dx = (player.x + 15) - (this.x + 15);
-            const dy = (player.y + 30) - (this.y + 30);
+            const dx = tx - (this.x + 15);
+            const dy = ty - (this.y + 30);
             const len = Math.sqrt(dx * dx + dy * dy) || 1;
             this.slimeJumpDirX = dx / len;
             this.slimeJumpDirY = dy / len;
@@ -375,8 +389,8 @@ export class Zombie {
         }
       } else if (this.zombieType === "ghost") {
         // --- Ghost Sine Wave Float AI ---
-        const dx = (player.x + 15) - (this.x + 15);
-        const dy = (player.y + 30) - (this.y + 30);
+        const dx = tx - (this.x + 15);
+        const dy = ty - (this.y + 30);
         const dist = Math.sqrt(dx * dx + dy * dy) || 1;
         const dirX = dx / dist;
         const dirY = dy / dist;
@@ -392,8 +406,8 @@ export class Zombie {
         this.direct = dirX > 0 ? 27 : 9;
       } else if (this.zombieType === "skeleton") {
         // --- Skeleton Ranged AI ---
-        const dx = (player.x + 15) - (this.x + 15);
-        const dy = (player.y + 30) - (this.y + 30);
+        const dx = tx - (this.x + 15);
+        const dy = ty - (this.y + 30);
         const dist = Math.sqrt(dx * dx + dy * dy) || 1;
         const dirX = dx / dist;
         const dirY = dy / dist;
@@ -427,18 +441,18 @@ export class Zombie {
           this.shootCooldown--;
         } else if (spawnProjectileCallback) {
           this.shootCooldown = 120 + Math.random() * 40;
-          spawnProjectileCallback(this.x + 15, this.y + 30, player.x + 15, player.y + 30);
+          spawnProjectileCallback(this.x + 15, this.y + 30, tx, ty);
         }
       } else if (this.zombieType === "brute") {
         // --- Brute Charger AI ---
         if (this.bruteChargeCooldown > 0) {
           this.bruteChargeCooldown--;
           
-          const reachedLR = this.chaseLR(player);
-          const reachedTB = this.chaseTB(player);
+          const reachedLR = this.chaseLR(target);
+          const reachedTB = this.chaseTB(target);
           if (reachedLR && reachedTB && !this.moving) {
             this.isAtk = true;
-            this.performAttack(player, counter);
+            this.performAttack(player, resonator, actualTargetType, counter);
           } else {
             this.isAtk = false;
           }
@@ -453,14 +467,14 @@ export class Zombie {
           this.speedX = 0;
           this.speedY = 0;
           this.moving = false;
-          // Face player in prep
-          const dx = player.x - this.x;
+          // Face target in prep
+          const dx = tx - this.x;
           this.direct = dx > 0 ? 27 : 9;
           
           if (this.brutePrepTicks === 0) {
             this.bruteChargeTicks = 40; // 0.6s dash
-            const dxC = (player.x + 15) - (this.x + 15);
-            const dyC = (player.y + 30) - (this.y + 30);
+            const dxC = tx - (this.x + 15);
+            const dyC = ty - (this.y + 30);
             const dist = Math.sqrt(dxC * dxC + dyC * dyC) || 1;
             this.chargeDirX = dxC / dist;
             this.chargeDirY = dyC / dist;
@@ -481,22 +495,29 @@ export class Zombie {
 
           // Damage check during charge dash
           const hitbox = this.getAttackHitbox();
-          const hit = checkRectCollision(
+          const hit = actualTargetType === "resonator" ? checkRectCollision(
+            hitbox.x, hitbox.y, hitbox.w, hitbox.h,
+            target.x, target.y, target.width, target.height
+          ) : checkRectCollision(
             hitbox.x, hitbox.y, hitbox.w, hitbox.h,
             player.x + 15, player.y, 30, 60
           );
           if (hit) {
-            player.takeDamage(this.damage * 1.5); // Extra crash damage
+            if (actualTargetType === "resonator" && resonator) {
+              resonator.takeDamage(this.damage * 1.5);
+            } else {
+              player.takeDamage(this.damage * 1.5); // Extra crash damage
+            }
           }
         }
       } else {
         // --- Standard Zombie Chase ---
-        const reachedLR = this.chaseLR(player);
-        const reachedTB = this.chaseTB(player);
+        const reachedLR = this.chaseLR(target);
+        const reachedTB = this.chaseTB(target);
 
         if (reachedLR && reachedTB && !this.moving) {
           this.isAtk = true;
-          this.performAttack(player, counter);
+          this.performAttack(player, resonator, actualTargetType, counter);
         } else {
           this.isAtk = false;
         }
@@ -570,16 +591,16 @@ export class Zombie {
     this.timer -= 1;
   }
 
-  private chaseLR(player: Player): boolean {
+  private chaseLR(target: { x: number; width: number }): boolean {
     const acc = 1.0;
     const currentMax = this.maxSpeedVal;
-    if (this.cx > player.x + 61) {
+    if (this.cx > target.x + target.width) {
       if (this.speedX > -currentMax) {
         this.speedX -= acc;
       }
       this.moving = true;
       return false;
-    } else if (this.cx < player.x) {
+    } else if (this.cx < target.x) {
       if (this.speedX < currentMax) {
         this.speedX += acc;
       }
@@ -589,16 +610,16 @@ export class Zombie {
     return true;
   }
 
-  private chaseTB(player: Player): boolean {
+  private chaseTB(target: { y: number; height: number }): boolean {
     const acc = 1.0;
     const currentMax = this.maxSpeedVal;
-    if (this.cy > player.y + 64) {
+    if (this.cy > target.y + target.height) {
       if (this.speedY > -currentMax) {
         this.speedY -= acc;
       }
       this.moving = true;
       return false;
-    } else if (this.cy < player.y) {
+    } else if (this.cy < target.y) {
       if (this.speedY < currentMax) {
         this.speedY += acc;
       }
@@ -637,21 +658,34 @@ export class Zombie {
     return { x: xS, y: yS, w: W, h: H };
   }
 
-  private performAttack(player: Player, counter: number): void {
+  private performAttack(
+    player: Player,
+    resonator: { x: number; y: number; health: number; takeDamage: (amount: number) => void } | null,
+    actualTargetType: "player" | "resonator",
+    counter: number
+  ): void {
     this.atkCounter = this.atkseq;
     if (counter % 5 === 0) {
       this.atkseq += 1;
     }
 
-    // Check hit against player bounding box (Hero.x + 15, Hero.y, 30, 60)
     const hitbox = this.getAttackHitbox();
-    const hit = checkRectCollision(
-      hitbox.x, hitbox.y, hitbox.w, hitbox.h,
-      player.x + 15, player.y, 30, 60
-    );
-
-    if (hit) {
-      player.takeDamage(this.damage);
+    if (actualTargetType === "resonator" && resonator) {
+      const hit = checkRectCollision(
+        hitbox.x, hitbox.y, hitbox.w, hitbox.h,
+        resonator.x - 28, resonator.y - 28, 56, 56
+      );
+      if (hit) {
+        resonator.takeDamage(this.damage);
+      }
+    } else {
+      const hit = checkRectCollision(
+        hitbox.x, hitbox.y, hitbox.w, hitbox.h,
+        player.x + 15, player.y, 30, 60
+      );
+      if (hit) {
+        player.takeDamage(this.damage);
+      }
     }
 
     if (this.atkseq > 5) {
