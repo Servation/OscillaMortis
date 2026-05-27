@@ -798,45 +798,13 @@ function generateProceduralBackgrounds() {
   sandCanvas.width = MAP_WIDTH;
   sandCanvas.height = MAP_HEIGHT;
   const sCtx = sandCanvas.getContext("2d")!;
-  
-  sCtx.fillStyle = "#fef08a";
-  sCtx.fillRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
-  
-  sCtx.fillStyle = "#fde047";
-  sCtx.strokeStyle = "#facc15";
-  sCtx.lineWidth = 4;
-  
-  const duneCurves = [
-    { startY: 200, cp1x: 400, cp1y: 100, cp2x: 800, cp2y: 300, endY: 250 },
-    { startY: 450, cp1x: 300, cp1y: 550, cp2x: 900, cp2y: 350, endY: 500 },
-    { startY: 700, cp1x: 500, cp1y: 600, cp2x: 700, cp2y: 800, endY: 720 },
-    { startY: 50,  cp1x: 600, cp1y: 150, cp2x: 1000,cp2y: 20,  endY: 80  }
-  ];
-  
-  for (const dune of duneCurves) {
-    sCtx.beginPath();
-    sCtx.moveTo(0, dune.startY);
-    sCtx.bezierCurveTo(dune.cp1x, dune.cp1y, dune.cp2x, dune.cp2y, MAP_WIDTH, dune.endY);
-    sCtx.lineTo(MAP_WIDTH, MAP_HEIGHT);
-    sCtx.lineTo(0, MAP_HEIGHT);
-    sCtx.closePath();
-    sCtx.globalAlpha = 0.35;
-    sCtx.fill();
-    sCtx.globalAlpha = 1.0;
-    
-    sCtx.beginPath();
-    sCtx.moveTo(0, dune.startY);
-    sCtx.bezierCurveTo(dune.cp1x, dune.cp1y, dune.cp2x, dune.cp2y, MAP_WIDTH, dune.endY);
-    sCtx.globalAlpha = 0.5;
-    sCtx.stroke();
-    sCtx.globalAlpha = 1.0;
-  }
-  
-  sCtx.fillStyle = "#eab308";
-  for (let i = 0; i < 4000; i++) {
-    const rx = Math.random() * MAP_WIDTH;
-    const ry = Math.random() * MAP_HEIGHT;
-    sCtx.fillRect(rx, ry, 2, 2);
+  const sandImg = biomeImages.get("desert_floor");
+  if (sandImg) {
+    sCtx.drawImage(sandImg, 0, 0, MAP_WIDTH, MAP_HEIGHT);
+  } else {
+    // Fallback if image fails to load
+    sCtx.fillStyle = "#fef08a";
+    sCtx.fillRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
   }
   sandPattern = sandCanvas;
 
@@ -845,51 +813,13 @@ function generateProceduralBackgrounds() {
   snowCanvas.width = MAP_WIDTH;
   snowCanvas.height = MAP_HEIGHT;
   const snCtx = snowCanvas.getContext("2d")!;
-  
-  snCtx.fillStyle = "#f1f5f9";
-  snCtx.fillRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
-  
-  snCtx.fillStyle = "#e2e8f0";
-  const driftCurves = [
-    { startY: 150, cp1x: 400, cp1y: 250, cp2x: 800, cp2y: 50,  endY: 180 },
-    { startY: 380, cp1x: 500, cp1y: 300, cp2x: 700, cp2y: 450, endY: 400 },
-    { startY: 620, cp1x: 300, cp1y: 700, cp2x: 900, cp2y: 550, endY: 650 }
-  ];
-  
-  for (const drift of driftCurves) {
-    snCtx.beginPath();
-    snCtx.moveTo(0, drift.startY);
-    snCtx.bezierCurveTo(drift.cp1x, drift.cp1y, drift.cp2x, drift.cp2y, MAP_WIDTH, drift.endY);
-    snCtx.lineTo(MAP_WIDTH, MAP_HEIGHT);
-    snCtx.lineTo(0, MAP_HEIGHT);
-    snCtx.closePath();
-    snCtx.globalAlpha = 0.4;
-    snCtx.fill();
-    snCtx.globalAlpha = 1.0;
-  }
-  
-  snCtx.strokeStyle = "#93c5fd";
-  snCtx.lineWidth = 1.5;
-  snCtx.globalAlpha = 0.4;
-  for (let c = 0; c < 5; c++) {
-    snCtx.beginPath();
-    let cx = Math.random() * MAP_WIDTH;
-    let cy = Math.random() * MAP_HEIGHT;
-    snCtx.moveTo(cx, cy);
-    for (let s = 0; s < 5; s++) {
-      cx += (Math.random() - 0.5) * 120;
-      cy += (Math.random() - 0.5) * 80;
-      snCtx.lineTo(cx, cy);
-    }
-    snCtx.stroke();
-  }
-  snCtx.globalAlpha = 1.0;
-  
-  snCtx.fillStyle = "#cbd5e1";
-  for (let i = 0; i < 3000; i++) {
-    const rx = Math.random() * MAP_WIDTH;
-    const ry = Math.random() * MAP_HEIGHT;
-    snCtx.fillRect(rx, ry, 2 + Math.random() * 2, 2);
+  const snowImg = biomeImages.get("tundra_floor");
+  if (snowImg) {
+    snCtx.drawImage(snowImg, 0, 0, MAP_WIDTH, MAP_HEIGHT);
+  } else {
+    // Fallback
+    snCtx.fillStyle = "#f1f5f9";
+    snCtx.fillRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
   }
   snowPattern = snowCanvas;
 
@@ -898,55 +828,14 @@ function generateProceduralBackgrounds() {
   lavaCanvas.width = MAP_WIDTH;
   lavaCanvas.height = MAP_HEIGHT;
   const lCtx = lavaCanvas.getContext("2d")!;
-  
-  lCtx.fillStyle = "#0c0a12";
-  lCtx.fillRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
-  
-  lCtx.strokeStyle = "#111019";
-  lCtx.lineWidth = 4;
-  for (let i = 0; i < 15; i++) {
-    lCtx.beginPath();
-    lCtx.arc(Math.random() * MAP_WIDTH, Math.random() * MAP_HEIGHT, 80 + Math.random() * 120, 0, Math.PI * 2);
-    lCtx.stroke();
+  const lavaImg = biomeImages.get("lava_floor");
+  if (lavaImg) {
+    lCtx.drawImage(lavaImg, 0, 0, MAP_WIDTH, MAP_HEIGHT);
+  } else {
+    // Fallback
+    lCtx.fillStyle = "#0c0a12";
+    lCtx.fillRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
   }
-  
-  const magmaPaths = [
-    { startX: 0, startY: 100, cp1x: 400, cp1y: 300, cp2x: 800, cp2y: 500, endX: MAP_WIDTH, endY: 700 },
-    { startX: 300, startY: 0, cp1x: 500, cp1y: 400, cp2x: 600, cp2y: 600, endX: 700, endY: MAP_HEIGHT },
-    { startX: MAP_WIDTH, startY: 200, cp1x: 800, cp1y: 350, cp2x: 400, cp2y: 450, endX: 0, endY: 600 }
-  ];
-  
-  for (const path of magmaPaths) {
-    lCtx.strokeStyle = "#7f1d1d";
-    lCtx.lineWidth = 45;
-    lCtx.lineCap = "round";
-    lCtx.beginPath();
-    lCtx.moveTo(path.startX, path.startY);
-    lCtx.bezierCurveTo(path.cp1x, path.cp1y, path.cp2x, path.cp2y, path.endX, path.endY);
-    lCtx.stroke();
-    
-    lCtx.strokeStyle = "#ea580c";
-    lCtx.lineWidth = 20;
-    lCtx.beginPath();
-    lCtx.moveTo(path.startX, path.startY);
-    lCtx.bezierCurveTo(path.cp1x, path.cp1y, path.cp2x, path.cp2y, path.endX, path.endY);
-    lCtx.stroke();
-    
-    lCtx.strokeStyle = "#facc15";
-    lCtx.lineWidth = 6;
-    lCtx.beginPath();
-    lCtx.moveTo(path.startX, path.startY);
-    lCtx.bezierCurveTo(path.cp1x, path.cp1y, path.cp2x, path.cp2y, path.endX, path.endY);
-    lCtx.stroke();
-  }
-  
-  lCtx.fillStyle = "#ef4444";
-  for (let i = 0; i < 800; i++) {
-    const rx = Math.random() * MAP_WIDTH;
-    const ry = Math.random() * MAP_HEIGHT;
-    lCtx.fillRect(rx, ry, 2, 2);
-  }
-  
   lavaPattern = lavaCanvas;
 }
 
@@ -1203,9 +1092,9 @@ async function preloadAssets() {
 
   // Preload optional biome assets (floors and obstacles)
   const biomeFiles = [
-    { key: "desert_floor", file: "desert_floor.png" },
-    { key: "tundra_floor", file: "tundra_floor.png" },
-    { key: "lava_floor", file: "lava_floor.png" },
+    { key: "desert_floor", file: "desert_floor.jpg" },
+    { key: "tundra_floor", file: "tundra_floor.jpg" },
+    { key: "lava_floor", file: "lava_floor.jpg" },
     
     { key: "grass_shrub", file: "grass_shrub.png" },
     { key: "grass_rock", file: "grass_rock.png" },
@@ -1227,7 +1116,8 @@ async function preloadAssets() {
   for (const b of biomeFiles) {
     const imgRaw = await tryLoadImage(`/assets/${b.file}`);
     if (imgRaw) {
-      const img = await filterImageTransparency(imgRaw);
+      // Do not apply transparency filter to full-screen floor backgrounds
+      const img = b.key.endsWith("_floor") ? imgRaw : await filterImageTransparency(imgRaw);
       biomeImages.set(b.key, img);
     }
   }
