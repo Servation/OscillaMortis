@@ -470,3 +470,12 @@ body {
   }
 }
 
+/* Slime-chase animation canvas (start screen) */
+#chase-canvas {
+  display: block;
+  margin: 24px auto 0;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.35);
+  border: 1px solid rgba(74, 222, 128, 0.12);
+  image-rendering: pixelated;
+}
