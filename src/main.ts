@@ -663,20 +663,19 @@ function initGame() {
 function spawnZombieFromDirection(dir: "top" | "bottom" | "left" | "right") {
   let spawnX = 0;
   let spawnY = 0;
-  const offset = (Math.random() - 0.5) * 160;
 
   if (dir === "top") {
-    spawnX = MAP_WIDTH / 2 + offset;
-    spawnY = -25;
+    spawnX = 60 + Math.random() * (MAP_WIDTH - 120);
+    spawnY = -35;
   } else if (dir === "bottom") {
-    spawnX = MAP_WIDTH / 2 + offset;
-    spawnY = MAP_HEIGHT + 15;
+    spawnX = 60 + Math.random() * (MAP_WIDTH - 120);
+    spawnY = MAP_HEIGHT + 25;
   } else if (dir === "right") {
-    spawnX = MAP_WIDTH + 15;
-    spawnY = MAP_HEIGHT / 2 + offset;
+    spawnX = MAP_WIDTH + 25;
+    spawnY = 60 + Math.random() * (MAP_HEIGHT - 120);
   } else { // left
-    spawnX = -15;
-    spawnY = MAP_HEIGHT / 2 + offset;
+    spawnX = -35;
+    spawnY = 60 + Math.random() * (MAP_HEIGHT - 120);
   }
 
   // Difficulty Type Distribution based on wave progress
