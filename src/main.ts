@@ -678,15 +678,15 @@ function spawnZombieFromDirection(dir: "top" | "bottom" | "left" | "right") {
 
   if (dir === "top") {
     spawnX = MAP_WIDTH / 2 + offset;
-    spawnY = -60;
+    spawnY = -25;
   } else if (dir === "bottom") {
     spawnX = MAP_WIDTH / 2 + offset;
-    spawnY = MAP_HEIGHT + 30;
+    spawnY = MAP_HEIGHT + 15;
   } else if (dir === "right") {
-    spawnX = MAP_WIDTH + 20;
+    spawnX = MAP_WIDTH + 15;
     spawnY = MAP_HEIGHT / 2 + offset;
   } else { // left
-    spawnX = -20;
+    spawnX = -15;
     spawnY = MAP_HEIGHT / 2 + offset;
   }
 

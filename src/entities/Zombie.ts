@@ -1,4 +1,4 @@
-import { checkCircleSquareCollision, checkRectCollision } from "../engine/Collision";
+import { checkRectCollision } from "../engine/Collision";
 import { Player } from "./Player";
 
 export type ZombieType = "slime" | "minislime" | "walker" | "runner" | "ghost" | "skeleton" | "brute";
@@ -332,21 +332,10 @@ export class Zombie {
       actualTargetType = "resonator";
     }
 
-    // Check if target is detected (Runner aggro range is 1.25x bigger, Brute is 0.9x, slime is 0.8x)
-    const activeRadius = this.zombieType === "runner" ? this.cRadius * 1.25 : 
-                         this.zombieType === "brute" ? this.cRadius * 0.9 : 
-                         (this.zombieType === "slime" || this.zombieType === "minislime") ? this.cRadius * 0.8 : this.cRadius;
 
-    // Resonator is constantly detected; player requires proximity
-    const isTargetDetected = actualTargetType === "resonator" || checkCircleSquareCollision(
-      this.cx,
-      this.cy,
-      activeRadius,
-      player.x,
-      player.y,
-      61,
-      64
-    );
+
+    // Mobs in the invading horde always track and chase their active target
+    const isTargetDetected = true;
 
     if (isTargetDetected) {
       if (this.playZomSound) {
