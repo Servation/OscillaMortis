@@ -1,4 +1,4 @@
-import { MAP_WIDTH, MAP_HEIGHT } from "../main";
+import { MAP_WIDTH, MAP_HEIGHT } from "../engine/Constants";
 
 export class SpellProjectile {
   public x: number;

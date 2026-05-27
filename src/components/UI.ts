@@ -5,14 +5,14 @@ export class UIManager {
   private interactPrompt: HTMLElement;
 
   private finalCoins: HTMLElement;
-  private finalZombies: HTMLElement;
+  private finalMobs: HTMLElement;
 
   constructor() {
     this.startScreen = document.getElementById("start-screen")!;
     this.gameOverScreen = document.getElementById("game-over-screen")!;
     this.interactPrompt = document.getElementById("interact-prompt")!;
     this.finalCoins = document.getElementById("final-coins")!;
-    this.finalZombies = document.getElementById("final-zombies")!;
+    this.finalMobs = document.getElementById("final-mobs")!;
   }
 
   public showStartScreen(onStart: () => void): void {
@@ -40,10 +40,10 @@ export class UIManager {
     }
   }
 
-  public showGameOver(coins: number, totalZombies: number, onRestart: () => void, resonatorDestroyed: boolean = false): void {
+  public showGameOver(coins: number, totalMobs: number, onRestart: () => void, resonatorDestroyed: boolean = false): void {
     this.gameOverScreen.classList.remove("hidden");
     this.finalCoins.innerText = coins.toString();
-    this.finalZombies.innerText = totalZombies.toString();
+    this.finalMobs.innerText = totalMobs.toString();
 
     const titleEl = this.gameOverScreen.querySelector<HTMLElement>("h1");
     const subEl = this.gameOverScreen.querySelector<HTMLElement>(".subtitle");

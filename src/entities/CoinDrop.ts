@@ -1,4 +1,5 @@
-import { MAP_WIDTH, MAP_HEIGHT, sound } from "../main";
+import { MAP_WIDTH, MAP_HEIGHT } from "../engine/Constants";
+import { sound } from "../engine/Sound";
 import { Player } from "./Player";
 
 export class CoinDrop {

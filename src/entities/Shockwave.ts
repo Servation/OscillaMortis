@@ -1,4 +1,4 @@
-import { Zombie } from "./Zombie";
+import { Mob } from "./Mob";
 
 export class Shockwave {
   public x: number;
@@ -7,7 +7,7 @@ export class Shockwave {
   public maxRadius: number = 150;
   public speed: number = 8;
   public active: boolean = true;
-  public hitZombies: Set<Zombie> = new Set();
+  public hitMobs: Set<Mob> = new Set();
 
   constructor(x: number, y: number) {
     this.x = x;

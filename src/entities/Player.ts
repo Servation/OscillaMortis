@@ -318,7 +318,7 @@ export class Player {
   }
 
   // Draw the equipped weapon on the player
-  private drawWeapon(ctx: CanvasRenderingContext2D, itemImages?: Map<string, HTMLImageElement>): void {
+  private drawWeapon(ctx: CanvasRenderingContext2D, itemImages?: Map<string, HTMLImageElement | HTMLCanvasElement>): void {
     const stats = this.getWeaponStats();
     const dirGroup = this.getDirectionGroup();
 
@@ -422,7 +422,7 @@ export class Player {
     ctx.restore();
   }
 
-  public draw(ctx: CanvasRenderingContext2D, itemImages?: Map<string, HTMLImageElement>): void {
+  public draw(ctx: CanvasRenderingContext2D, itemImages?: Map<string, HTMLImageElement | HTMLCanvasElement>): void {
     if (!this.visible) return;
 
     // 1. Draw Player Shadow (ellipse under feet)

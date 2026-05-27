@@ -1,4 +1,5 @@
-import { MAP_WIDTH, MAP_HEIGHT, sound } from "../main";
+import { MAP_WIDTH, MAP_HEIGHT } from "../engine/Constants";
+import { sound } from "../engine/Sound";
 import { Player } from "./Player";
 
 export class LootDrop {
@@ -71,7 +72,7 @@ export class LootDrop {
     }
   }
 
-  public draw(ctx: CanvasRenderingContext2D, itemImages: Map<string, HTMLImageElement>, gameCounter: number) {
+  public draw(ctx: CanvasRenderingContext2D, itemImages: Map<string, HTMLImageElement | HTMLCanvasElement>, gameCounter: number) {
     ctx.save();
     if (this.life < 120) {
       ctx.globalAlpha = this.life / 120;

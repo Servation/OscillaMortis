@@ -1,5 +1,5 @@
 import { Player } from "./Player";
-import { Zombie } from "./Zombie";
+import { Mob } from "./Mob";
 
 export interface BuildingTiles {
   roofback: HTMLImageElement;
@@ -266,15 +266,15 @@ export class Building {
     }
   }
 
-  // Resolve zombie collision against building base box (xb + 10, yb, 128, 128)
-  public resolveZombieCollision(zombie: Zombie): void {
+  // Resolve mob collision against building base box (xb + 10, yb, 128, 128)
+  public resolveMobCollision(mob: Mob): void {
     const xb = this.xBase + 10;
     const yb = this.yBase;
     const w = 128;
     const h = 128;
 
-    const cx = zombie.x + 29;
-    const cy = zombie.y + 59;
+    const cx = mob.x + 29;
+    const cy = mob.y + 59;
     const radius = 14;
 
     // Find the closest point on the building box
@@ -287,11 +287,11 @@ export class Building {
 
     if (distance < radius) {
       if (distance > 0) {
-        // Push zombie out along normal vector
+        // Push mob out along normal vector
         const pushX = (distX / distance) * (radius - distance);
         const pushY = (distY / distance) * (radius - distance);
-        zombie.x += pushX;
-        zombie.y += pushY;
+        mob.x += pushX;
+        mob.y += pushY;
       } else {
         // If center is exactly inside, push out to nearest edge
         const distLeft = cx - xb;
@@ -301,13 +301,13 @@ export class Building {
         const minDist = Math.min(distLeft, distRight, distTop, distBottom);
 
         if (minDist === distLeft) {
-          zombie.x = xb - 29 - radius;
+          mob.x = xb - 29 - radius;
         } else if (minDist === distRight) {
-          zombie.x = xb + w - 29 + radius;
+          mob.x = xb + w - 29 + radius;
         } else if (minDist === distTop) {
-          zombie.y = yb - 59 - radius;
+          mob.y = yb - 59 - radius;
         } else {
-          zombie.y = yb + h - 59 + radius;
+          mob.y = yb + h - 59 + radius;
         }
       }
     }
