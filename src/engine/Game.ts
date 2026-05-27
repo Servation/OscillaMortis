@@ -1009,12 +1009,12 @@ export class Game {
 
       if (dist <= 65) {
         if (item.type === "weapon") {
-          activePrompt = `Press [E] to buy ${item.name} (${item.cost} Coins)`;
+          activePrompt = `Press [F] to buy ${item.name} (${item.cost} Coins)`;
         } else {
-          activePrompt = `Press [E] to buy ${item.name} - ${item.description} (${item.cost} Coins)`;
+          activePrompt = `Press [F] to buy ${item.name} - ${item.description} (${item.cost} Coins)`;
         }
 
-        if (this.keyboard.isPressed("e")) {
+        if (this.keyboard.isPressed("f")) {
           if (this.player.Coin >= item.cost) {
             this.player.Coin -= item.cost;
             item.purchased = true;
