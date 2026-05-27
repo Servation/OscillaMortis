@@ -1506,7 +1506,7 @@ export class Game {
       ctx.translate(x, y);
       ctx.scale(sizeScale, sizeScale);
       ctx.rotate(angle);
-      ctx.drawImage(img, -12, -24, 24, 24);
+      ctx.drawImage(img, -24, -44, 48, 48);
       ctx.restore();
       return;
     }
