@@ -78,6 +78,11 @@ export class Player {
   public speedBoost: number = 0; // 0 to 1 (0.3 = 30% faster)
   public energyRegenRate: number = 0.15; // Base recovery rate per tick
 
+  // Player status effects (ticks remaining)
+  public fireTicks: number = 0;
+  public frostTicks: number = 0;
+  public poisonTicks: number = 0;
+
   // Permanent buffs
   public magicDamageMultiplier: number = 1.0;
 
@@ -159,7 +164,10 @@ export class Player {
   }
 
   public updateX(): void {
-    const baseMax = this.running ? 4.0 : 2.0;
+    let baseMax = this.running ? 4.0 : 2.0;
+    if (this.frostTicks > 0) {
+      baseMax *= 0.6; // 40% slow
+    }
     this.maxSpeed = baseMax * (1 + this.speedBoost);
 
     this.x += this.speedX;
@@ -184,6 +192,21 @@ export class Player {
 
   public postUpdate(hasInput: boolean): void {
     this.decelerate(hasInput);
+
+    // Tick down player status effects
+    if (this.fireTicks > 0) {
+      this.fireTicks--;
+      // Apply minor fire damage over time (0.05 damage per tick = 3 damage per second)
+      this.Health = Math.max(0, this.Health - 0.05);
+    }
+    if (this.frostTicks > 0) {
+      this.frostTicks--;
+    }
+    if (this.poisonTicks > 0) {
+      this.poisonTicks--;
+      // Apply minor poison damage over time (0.03 damage per tick = 1.8 damage per second)
+      this.Health = Math.max(0, this.Health - 0.03);
+    }
   }
 
   private decelerate(hasInput: boolean): void {
@@ -415,6 +438,15 @@ export class Player {
     }
 
     // 3. Draw Sprite
+    ctx.save();
+    if (this.frostTicks > 0) {
+      ctx.filter = "hue-rotate(180deg) saturate(1.5) brightness(1.1)";
+    } else if (this.fireTicks > 0) {
+      ctx.filter = "hue-rotate(330deg) saturate(2.0) brightness(1.2)";
+    } else if (this.poisonTicks > 0) {
+      ctx.filter = "hue-rotate(110deg) saturate(1.8) brightness(0.9)";
+    }
+
     if (this.knifing) {
       const frameIndex = dirGroup * 6 + this.knifeCounter;
 
@@ -436,6 +468,7 @@ export class Player {
         this.x, this.y, 61, 64 // Destination rect
       );
     }
+    ctx.restore();
 
     // 4. Draw Weapon in front for non-UP directions
     if (dirGroup !== 0) {

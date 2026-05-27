@@ -132,6 +132,17 @@ function filterImageTransparency(img: HTMLImageElement): Promise<HTMLImageElemen
 
 let floorDecals: FloorDecal[] = [];
 
+interface DamagePuddle {
+  x: number;
+  y: number;
+  radius: number;
+  type: "fire" | "poison";
+  life: number;
+  maxLife: number;
+}
+
+let damagePuddles: DamagePuddle[] = [];
+
 // Game State Variables
 let player: Player;
 let zombies: Zombie[] = [];
@@ -246,6 +257,62 @@ function drawFloorDecals(ctx: CanvasRenderingContext2D): void {
         ctx.closePath();
         ctx.fill();
       }
+    }
+  }
+  ctx.restore();
+}
+
+function drawDamagePuddles(ctx: CanvasRenderingContext2D): void {
+  ctx.save();
+  for (const puddle of damagePuddles) {
+    // Fade out puddle during the last 30 frames of life
+    const alpha = puddle.life < 30 ? puddle.life / 30 : 1.0;
+
+    ctx.shadowBlur = 10;
+    if (puddle.type === "fire") {
+      ctx.shadowColor = "rgba(239, 68, 68, 0.8)";
+
+      // Outer rim
+      const grad = ctx.createRadialGradient(puddle.x, puddle.y, 2, puddle.x, puddle.y, puddle.radius);
+      grad.addColorStop(0, `rgba(253, 224, 71, ${0.85 * alpha})`); // Yellow
+      grad.addColorStop(0.4, `rgba(249, 115, 22, ${0.6 * alpha})`);  // Orange
+      grad.addColorStop(1, `rgba(220, 38, 38, 0)`);               // Fade red
+
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.ellipse(puddle.x, puddle.y, puddle.radius, puddle.radius * 0.6, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Pulsing inner heat center
+      const pulse = Math.sin(gameCounter * 0.1) * 3;
+      ctx.fillStyle = `rgba(254, 240, 138, ${0.4 * alpha})`;
+      ctx.beginPath();
+      ctx.ellipse(puddle.x, puddle.y, (puddle.radius * 0.4) + pulse, ((puddle.radius * 0.4) + pulse) * 0.6, 0, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (puddle.type === "poison") {
+      ctx.shadowColor = "rgba(168, 85, 247, 0.8)";
+
+      // Toxic bubble puddle gradient
+      const grad = ctx.createRadialGradient(puddle.x, puddle.y, 2, puddle.x, puddle.y, puddle.radius);
+      grad.addColorStop(0, `rgba(168, 85, 247, ${0.8 * alpha})`); // Purple core
+      grad.addColorStop(0.6, `rgba(34, 197, 94, ${0.5 * alpha})`);  // Green pool
+      grad.addColorStop(1, `rgba(22, 163, 74, 0)`);                // Transparent border
+
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.ellipse(puddle.x, puddle.y, puddle.radius, puddle.radius * 0.65, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Small bubbling circles
+      ctx.fillStyle = `rgba(232, 121, 249, ${0.3 * alpha})`;
+      const bob1 = Math.sin(gameCounter * 0.05) * (puddle.radius * 0.2);
+      const bob2 = Math.cos(gameCounter * 0.07) * (puddle.radius * 0.25);
+
+      ctx.beginPath();
+      ctx.arc(puddle.x + bob1, puddle.y - 3 + bob2, 3, 0, Math.PI * 2);
+      ctx.arc(puddle.x - 10 + bob2, puddle.y + 2 - bob1, 2.5, 0, Math.PI * 2);
+      ctx.arc(puddle.x + 8 - bob2, puddle.y + 4 + bob1, 2, 0, Math.PI * 2);
+      ctx.fill();
     }
   }
   ctx.restore();
@@ -657,6 +724,7 @@ function initGame() {
   enemyProjectiles = [];
   coinDrops = [];
   zombies = [];
+  damagePuddles = [];
 }
 
 // Spawns a single zombie of appropriate type for the active wave from a specific direction
@@ -707,6 +775,15 @@ function spawnZombieFromDirection(dir: "top" | "bottom" | "left" | "right") {
     else if (roll < 0.55) type = "brute";
     else if (roll < 0.80) type = "runner";
     else type = "walker";
+  }
+
+  // Randomize slime types to include elemental varieties
+  if (type === "slime") {
+    const sRoll = Math.random();
+    if (sRoll < 0.40) type = "slime";
+    else if (sRoll < 0.60) type = "fire_slime";
+    else if (sRoll < 0.80) type = "frost_slime";
+    else type = "poison_slime";
   }
 
   let zSheet: HTMLImageElement | HTMLCanvasElement = assets.zombie;
@@ -760,21 +837,47 @@ function handleZombieDeath(zombie: Zombie) {
   let xpVal = 10;
   if (zombie.zombieType === "brute") xpVal = 30;
   else if (zombie.zombieType === "runner" || zombie.zombieType === "ghost" || zombie.zombieType === "skeleton") xpVal = 15;
-  else if (zombie.zombieType === "slime") xpVal = 12;
-  else if (zombie.zombieType === "minislime") xpVal = 5;
+  else if (zombie.zombieType === "slime" || zombie.zombieType === "fire_slime" || zombie.zombieType === "frost_slime" || zombie.zombieType === "poison_slime") xpVal = 12;
+  else if (zombie.zombieType === "minislime" || zombie.zombieType === "fire_minislime" || zombie.zombieType === "frost_minislime" || zombie.zombieType === "poison_minislime") xpVal = 5;
 
   player.addXP(xpVal, handlePlayerLevelUp);
 
   // Slime splitting logic
-  if (zombie.zombieType === "slime") {
+  if (zombie.zombieType === "slime" || zombie.zombieType === "fire_slime" || zombie.zombieType === "frost_slime" || zombie.zombieType === "poison_slime") {
     const splitCount = 2;
     waveTotalZombies += splitCount; // add minislimes to the wave total so clearing works
+    let childType: ZombieType = "minislime";
+    if (zombie.zombieType === "fire_slime") childType = "fire_minislime";
+    else if (zombie.zombieType === "frost_slime") childType = "frost_minislime";
+    else if (zombie.zombieType === "poison_slime") childType = "poison_minislime";
+
     for (let i = 0; i < splitCount; i++) {
       const angle = Math.random() * Math.PI * 2;
       const spawnX = zombie.x + Math.cos(angle) * 20;
       const spawnY = zombie.y + Math.sin(angle) * 20;
-      zombies.push(new Zombie(assets.zombie, MAP_WIDTH, MAP_HEIGHT, spawnX, spawnY, "minislime"));
+      zombies.push(new Zombie(assets.zombie, MAP_WIDTH, MAP_HEIGHT, spawnX, spawnY, childType));
     }
+  }
+
+  // Spawns environmental damage puddles on elemental death
+  if (zombie.zombieType === "fire_slime" || zombie.zombieType === "fire_minislime") {
+    damagePuddles.push({
+      x: cx,
+      y: cy,
+      radius: zombie.isMinislime ? 24 : 38,
+      type: "fire",
+      life: 180, // 3 seconds
+      maxLife: 180
+    });
+  } else if (zombie.zombieType === "poison_slime" || zombie.zombieType === "poison_minislime") {
+    damagePuddles.push({
+      x: cx,
+      y: cy,
+      radius: zombie.isMinislime ? 24 : 38,
+      type: "poison",
+      life: 210, // 3.5 seconds
+      maxLife: 210
+    });
   }
 }
 
@@ -1516,6 +1619,32 @@ function updatePhysics() {
       drop.update(player);
       if (!drop.active) {
         lootDrops.splice(i, 1);
+      }
+    }
+
+    // Update Damage Puddles (ground hazards)
+    for (let i = damagePuddles.length - 1; i >= 0; i--) {
+      const puddle = damagePuddles[i];
+      puddle.life--;
+
+      // Collision check with player center (player feet is player.x + 15, player.y + 50)
+      const pCx = player.x + 15;
+      const pCy = player.y + 50;
+      const dx = pCx - puddle.x;
+      const dy = pCy - puddle.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < puddle.radius + 14) {
+        if (puddle.type === "fire") {
+          player.fireTicks = Math.max(player.fireTicks, 45); // refresh burn
+          player.Health = Math.max(0, player.Health - 0.1); // extra damage while standing on it
+        } else if (puddle.type === "poison") {
+          player.poisonTicks = Math.max(player.poisonTicks, 60); // refresh poison
+          player.Health = Math.max(0, player.Health - 0.05); // extra damage while standing on it
+        }
+      }
+
+      if (puddle.life <= 0) {
+        damagePuddles.splice(i, 1);
       }
     }
 
@@ -2709,6 +2838,9 @@ function drawGame() {
 
     // Draw floor decals to break up tiling patterns
     drawFloorDecals(ctx);
+
+    // Draw active environmental damage puddles
+    drawDamagePuddles(ctx);
 
     // Draw teleport portal (preparation phase only)
     drawTeleportPortal(ctx);

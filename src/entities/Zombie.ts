@@ -1,12 +1,21 @@
 import { checkRectCollision } from "../engine/Collision";
 import { Player } from "./Player";
 
-export type ZombieType = "slime" | "minislime" | "walker" | "runner" | "ghost" | "skeleton" | "brute";
+export type ZombieType = "slime" | "minislime" | "walker" | "runner" | "ghost" | "skeleton" | "brute" |
+  "fire_slime" | "fire_minislime" |
+  "frost_slime" | "frost_minislime" |
+  "poison_slime" | "poison_minislime";
 
 // Sound name map for each mob type
 const MOB_SOUND_MAP: Record<ZombieType, string> = {
   slime: "slime_aggro",
   minislime: "slime_aggro",
+  fire_slime: "slime_aggro",
+  fire_minislime: "slime_aggro",
+  frost_slime: "slime_aggro",
+  frost_minislime: "slime_aggro",
+  poison_slime: "slime_aggro",
+  poison_minislime: "slime_aggro",
   walker: "zombie",
   runner: "runner_aggro",
   ghost: "ghost_aggro",
@@ -45,6 +54,25 @@ export class Zombie {
   public frozenBlockTicks: number = 0;
   public hasEnteredPlayableArea: boolean = false;
   public aggroTarget: "player" | "resonator" = "resonator";
+  public touchDamageCooldown: number = 0;
+
+  public get isSlimeOrMinislime(): boolean {
+    return this.zombieType === "slime" || 
+           this.zombieType === "minislime" ||
+           this.zombieType === "fire_slime" ||
+           this.zombieType === "fire_minislime" ||
+           this.zombieType === "frost_slime" ||
+           this.zombieType === "frost_minislime" ||
+           this.zombieType === "poison_slime" ||
+           this.zombieType === "poison_minislime";
+  }
+
+  public get isMinislime(): boolean {
+    return this.zombieType === "minislime" ||
+           this.zombieType === "fire_minislime" ||
+           this.zombieType === "frost_minislime" ||
+           this.zombieType === "poison_minislime";
+  }
 
   public get maxSpeedVal(): number {
     let speed = this.maxSpeed;
@@ -114,21 +142,21 @@ export class Zombie {
     this.zombieType = type;
 
     // Configure properties based on zombie type
-    if (type === "slime") {
+    if (type === "slime" || type === "fire_slime" || type === "frost_slime" || type === "poison_slime") {
       this.Health = 80;
       this.maxSpeed = 2.0;
       this.scale = 1.1;
       this.filterString = "none";
-      this.damage = 0.1;
+      this.damage = type === "slime" ? 0.08 : 0.06; // Elemental touches deal slightly less raw physical but apply DOTs
       this.coinRewardMin = 1;
       this.coinRewardMax = 3;
       this.slimeRestTicks = Math.floor(Math.random() * 30) + 40;
-    } else if (type === "minislime") {
-      this.Health = 20;
+    } else if (type === "minislime" || type === "fire_minislime" || type === "frost_minislime" || type === "poison_minislime") {
+      this.Health = 25; // 25 HP so they don't get one-shot by basic wooden sword (20 dmg)
       this.maxSpeed = 3.0;
       this.scale = 0.65;
       this.filterString = "none";
-      this.damage = 0.05;
+      this.damage = type === "minislime" ? 0.04 : 0.03;
       this.coinRewardMin = 0;
       this.coinRewardMax = 1;
       this.slimeRestTicks = Math.floor(Math.random() * 20) + 20;
@@ -195,6 +223,9 @@ export class Zombie {
 
   public update(): void {
     this.tickCounter++;
+    if (this.touchDamageCooldown > 0) {
+      this.touchDamageCooldown--;
+    }
     // Process status effects
     if (this.fireTicks > 0) {
       this.fireTicks--;
@@ -310,7 +341,7 @@ export class Zombie {
   // Zombie AI logic
   public runAI(
     player: Player,
-    resonator: { x: number; y: number; health: number; takeDamage: (amount: number) => void } | null,
+    resonator: { x: number; y: number; radius: number; health: number; takeDamage: (amount: number) => void } | null,
     counter: number,
     playSoundCallback: (sound: string) => void,
     spawnProjectileCallback?: (sx: number, sy: number, tx: number, ty: number) => void
@@ -347,7 +378,7 @@ export class Zombie {
       const ty = actualTargetType === "resonator" ? target.y + target.height / 2 : player.y + 30;
 
       // Handle custom AIs
-      if (this.zombieType === "slime" || this.zombieType === "minislime") {
+      if (this.isSlimeOrMinislime) {
         // --- Slime Jump/Bounce AI ---
         if (this.slimeRestTicks > 0 && this.slimeJumpTicks === 0) {
           this.slimeRestTicks--;
@@ -364,7 +395,7 @@ export class Zombie {
           }
         }
         if (this.slimeJumpTicks > 0) {
-          let jumpSpeed = this.zombieType === "minislime" ? 3.2 : 2.2;
+          let jumpSpeed = this.isMinislime ? 3.2 : 2.2;
           if (this.freezeTicks > 0) jumpSpeed *= 0.4;
           if (this.isFrozenBlock) jumpSpeed = 0;
           this.speedX = this.slimeJumpDirX * jumpSpeed;
@@ -374,6 +405,38 @@ export class Zombie {
           this.slimeJumpTicks--;
           if (this.slimeJumpTicks === 0) {
             this.slimeRestTicks = Math.floor(Math.random() * 30) + 40;
+          }
+        }
+
+        // Touch attack damage check
+        if (this.touchDamageCooldown === 0) {
+          const zCx = this.x + 30;
+          const zCy = this.y + 40;
+          if (actualTargetType === "resonator" && resonator) {
+            const dx = zCx - resonator.x;
+            const dy = zCy - resonator.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < resonator.radius + 14) {
+              resonator.takeDamage(this.damage);
+              this.touchDamageCooldown = 60; // 1s cooldown
+            }
+          } else {
+            const dx = zCx - (player.x + 15);
+            const dy = zCy - (player.y + 30);
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < 28) {
+              player.takeDamage(this.damage);
+              this.touchDamageCooldown = 60; // 1s cooldown
+
+              // Apply status effect based on slime type
+              if (this.zombieType === "fire_slime" || this.zombieType === "fire_minislime") {
+                player.fireTicks = Math.max(player.fireTicks, 180); // 3 seconds
+              } else if (this.zombieType === "frost_slime" || this.zombieType === "frost_minislime") {
+                player.frostTicks = Math.max(player.frostTicks, 150); // 2.5 seconds
+              } else if (this.zombieType === "poison_slime" || this.zombieType === "poison_minislime") {
+                player.poisonTicks = Math.max(player.poisonTicks, 210); // 3.5 seconds
+              }
+            }
           }
         }
       } else if (this.zombieType === "ghost") {
@@ -528,7 +591,7 @@ export class Zombie {
   }
 
   private wanderAI(): void {
-    if (this.zombieType === "slime" || this.zombieType === "minislime") {
+    if (this.isSlimeOrMinislime) {
       // Slime bouncy wandering
       if (this.slimeRestTicks > 0 && this.slimeJumpTicks === 0) {
         this.slimeRestTicks--;
@@ -543,7 +606,7 @@ export class Zombie {
         }
       }
       if (this.slimeJumpTicks > 0) {
-        let jumpSpeed = this.zombieType === "minislime" ? 1.6 : 1.0;
+        let jumpSpeed = this.isMinislime ? 1.6 : 1.0;
         if (this.freezeTicks > 0) jumpSpeed *= 0.4;
         if (this.isFrozenBlock) jumpSpeed = 0;
         this.speedX = this.slimeJumpDirX * jumpSpeed;
@@ -689,8 +752,8 @@ export class Zombie {
                   this.zombieType === "runner" ? 50 : 
                   this.zombieType === "ghost" ? 70 : 
                   this.zombieType === "skeleton" ? 60 :
-                  this.zombieType === "slime" ? 80 :
-                  this.zombieType === "minislime" ? 20 : 100;
+                  (this.zombieType === "slime" || this.zombieType === "fire_slime" || this.zombieType === "frost_slime" || this.zombieType === "poison_slime") ? 80 :
+                  (this.zombieType === "minislime" || this.zombieType === "fire_minislime" || this.zombieType === "frost_minislime" || this.zombieType === "poison_minislime") ? 25 : 100;
     if (this.Health >= maxHp) return;
 
     const barH = 5;
@@ -890,7 +953,17 @@ export class Zombie {
     else if (dirGroup === 3) nX = rx * 0.2;
 
     ctx.save();
-    ctx.fillStyle = this.zombieType === "minislime" ? "rgba(29, 78, 216, 0.6)" : "rgba(21, 128, 61, 0.6)"; // darker blue/green nucleus
+    let nucleusColor = "rgba(21, 128, 61, 0.6)"; // standard green slime
+    if (this.zombieType === "minislime") {
+      nucleusColor = "rgba(29, 78, 216, 0.6)"; // standard blue minislime
+    } else if (this.zombieType === "fire_slime" || this.zombieType === "fire_minislime") {
+      nucleusColor = "rgba(234, 88, 12, 0.7)"; // dark orange/red core
+    } else if (this.zombieType === "frost_slime" || this.zombieType === "frost_minislime") {
+      nucleusColor = "rgba(8, 145, 178, 0.7)"; // dark cyan/blue core
+    } else if (this.zombieType === "poison_slime" || this.zombieType === "poison_minislime") {
+      nucleusColor = "rgba(109, 40, 217, 0.7)"; // dark purple/indigo core
+    }
+    ctx.fillStyle = nucleusColor;
     drawSlimeBody(rx * 0.5, ry * 0.5, nX, nY + ry * 0.1);
     ctx.fill();
     ctx.restore();
@@ -1229,9 +1302,31 @@ export class Zombie {
     // Draw particles first (behind the mob)
     this.drawParticles(ctx);
 
-    if (this.zombieType === "slime" || this.zombieType === "minislime") {
-      const color = this.zombieType === "minislime" ? "rgba(59, 130, 246, 0.85)" : "rgba(34, 197, 94, 0.85)"; // Blue vs Green
-      const outlineColor = this.zombieType === "minislime" ? "#1d4ed8" : "#15803d";
+    if (this.isSlimeOrMinislime) {
+      let color = "rgba(34, 197, 94, 0.85)"; // standard green
+      let outlineColor = "#15803d";
+      if (this.zombieType === "minislime") {
+        color = "rgba(59, 130, 246, 0.85)"; // standard blue
+        outlineColor = "#1d4ed8";
+      } else if (this.zombieType === "fire_slime") {
+        color = "rgba(239, 68, 68, 0.85)"; // fire red
+        outlineColor = "#b91c1c";
+      } else if (this.zombieType === "fire_minislime") {
+        color = "rgba(249, 115, 22, 0.85)"; // fire orange
+        outlineColor = "#c2410c";
+      } else if (this.zombieType === "frost_slime") {
+        color = "rgba(6, 182, 212, 0.85)"; // frost cyan
+        outlineColor = "#0e7490";
+      } else if (this.zombieType === "frost_minislime") {
+        color = "rgba(14, 165, 233, 0.85)"; // frost sky blue
+        outlineColor = "#0369a1";
+      } else if (this.zombieType === "poison_slime") {
+        color = "rgba(168, 85, 247, 0.85)"; // poison purple
+        outlineColor = "#7e22ce";
+      } else if (this.zombieType === "poison_minislime") {
+        color = "rgba(236, 72, 153, 0.85)"; // poison pink-purple
+        outlineColor = "#be185d";
+      }
       this.drawSlime(ctx, color, outlineColor);
     } else if (this.zombieType === "skeleton") {
       this.drawSkeleton(ctx);
