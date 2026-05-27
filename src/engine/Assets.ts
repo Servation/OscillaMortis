@@ -54,37 +54,48 @@ function filterImageTransparency(baseImg: HTMLImageElement): Promise<HTMLImageEl
 
     const imgData = ctxTemp.getImageData(0, 0, canvasTemp.width, canvasTemp.height);
     const data = imgData.data;
+    const w = canvasTemp.width;
+    const h = canvasTemp.height;
 
-    // Check if the image already has transparency.
-    // If more than 3% of pixels have an alpha less than 100, we consider the image already transparent.
+    // Check if the image already has transparency (>3% transparent pixels).
     let transparentPixelCount = 0;
-    const totalPixels = canvasTemp.width * canvasTemp.height;
+    const totalPixels = w * h;
     for (let i = 3; i < data.length; i += 4) {
-      if (data[i] < 100) {
-        transparentPixelCount++;
-      }
+      if (data[i] < 100) transparentPixelCount++;
     }
     const alreadyTransparent = transparentPixelCount > (totalPixels * 0.03);
 
     if (!alreadyTransparent) {
-      // Detect background color (top-left pixel)
-      const rBg = data[0];
-      const gBg = data[1];
-      const bBg = data[2];
+      // Sample all 4 corners to find the most likely background color
+      const corners = [
+        [data[0], data[1], data[2]],                                             // top-left
+        [data[(w - 1) * 4], data[(w - 1) * 4 + 1], data[(w - 1) * 4 + 2]],     // top-right
+        [data[(h - 1) * w * 4], data[(h - 1) * w * 4 + 1], data[(h - 1) * w * 4 + 2]], // bottom-left
+        [data[((h - 1) * w + (w - 1)) * 4], data[((h - 1) * w + (w - 1)) * 4 + 1], data[((h - 1) * w + (w - 1)) * 4 + 2]], // bottom-right
+      ];
+
+      // Use the corner color that appears most among all 4 (fallback: top-left)
+      const colorFreq: Record<string, number> = {};
+      for (const [r, g, b] of corners) {
+        const key = `${r},${g},${b}`;
+        colorFreq[key] = (colorFreq[key] ?? 0) + 1;
+      }
+      const bgKey = Object.entries(colorFreq).sort((a, b) => b[1] - a[1])[0][0].split(",");
+      const rBg = parseInt(bgKey[0]), gBg = parseInt(bgKey[1]), bBg = parseInt(bgKey[2]);
 
       for (let i = 0; i < data.length; i += 4) {
-        const r = data[i];
-        const g = data[i + 1];
-        const b = data[i + 2];
-
+        const r = data[i], g = data[i + 1], b = data[i + 2];
         const diff = Math.sqrt(
           (r - rBg) * (r - rBg) +
           (g - gBg) * (g - gBg) +
           (b - bBg) * (b - bBg)
         );
 
-        if (diff < 40) {
-          data[i + 3] = 0; // set alpha to transparent
+        if (diff < 55) {
+          data[i + 3] = 0; // fully transparent
+        } else if (diff < 80) {
+          // Soft edge: blend out antialiased fringe pixels
+          data[i + 3] = Math.round(((diff - 55) / 25) * 255);
         }
       }
     }
